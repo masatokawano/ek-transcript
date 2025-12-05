@@ -252,3 +252,55 @@ test-results/
 
 # Build output
 dist/
+
+# ===== ek-transcript specific =====
+
+# Python additional
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+*.egg
+.eggs/
+*.whl
+
+# Lambda artifacts
+lambdas/**/layer/
+lambdas/**/*.zip
+.aws-sam/
+
+# CDK
+cdk.out/
+cdk/cdk.out/
+*.js.map
+
+# Model files (large)
+*.pt
+*.bin
+*.onnx
+models/
+
+# Audio/Video test files
+*.wav
+*.mp3
+*.mp4
+*.m4a
+*.flac
+*.ogg
+!tests/fixtures/*.wav
+
+# Secrets
+.env.local
+.env.*.local
+secrets.json
+*credentials*.json
+
+# Temporary processing files
+/tmp/
+*.rttm
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Docker
+*.tar

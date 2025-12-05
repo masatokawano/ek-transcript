@@ -1,0 +1,152 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ek-transcript"
+version = "0.1.0"
+description = "Speaker diarization transcription pipeline using AWS serverless"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [
+    { name = "ekusiadadus" }
+]
+keywords = ["transcription", "speaker-diarization", "whisper", "aws", "lambda"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    "boto3>=1.34.0",
+    "botocore>=1.34.0",
+]
+
+[project.optional-dependencies]
+extract-audio = [
+    "ffmpeg-python>=0.2.0",
+]
+diarize = [
+    "pyannote.audio>=3.1.0",
+    "torch>=2.0.0",
+]
+transcribe = [
+    "faster-whisper>=1.0.0",
+]
+split = [
+    "pydub>=0.25.1",
+]
+llm = [
+    "openai>=1.0.0",
+    "tenacity>=8.2.0",
+]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.12.0",
+    "pytest-asyncio>=0.23.0",
+    "moto[s3,secretsmanager]>=5.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.8.0",
+    "black>=24.0.0",
+    "isort>=5.13.0",
+    "pre-commit>=3.6.0",
+    "types-boto3>=1.0.0",
+]
+all = [
+    "ek-transcript[extract-audio,diarize,transcribe,split,llm,dev]",
+]
+
+[project.urls]
+Homepage = "https://github.com/ekusiadadus/ek-transcript"
+Repository = "https://github.com/ekusiadadus/ek-transcript"
+
+[tool.hatch.build.targets.wheel]
+packages = ["lambdas"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "lambdas"]
+python_files = ["test_*.py", "*_test.py"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--tb=short",
+    "--strict-markers",
+    "-ra",
+]
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests",
+    "e2e: End-to-end tests",
+    "slow: Slow tests",
+]
+
+[tool.coverage.run]
+source = ["lambdas"]
+branch = true
+omit = [
+    "*/tests/*",
+    "*/__pycache__/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
+fail_under = 80
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "C",   # flake8-comprehensions
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+    "S",   # flake8-bandit (security)
+]
+ignore = [
+    "E501",  # line too long (handled by black)
+    "S101",  # use of assert (ok in tests)
+]
+
+[tool.ruff.per-file-ignores]
+"tests/*" = ["S101"]
+"**/tests/*" = ["S101"]
+
+[tool.ruff.isort]
+known-first-party = ["lambdas"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.isort]
+profile = "black"
+line_length = 100
+known_first_party = ["lambdas"]
