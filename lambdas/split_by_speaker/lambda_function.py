@@ -3,6 +3,8 @@ SplitBySpeaker Lambda Function
 
 話者分離結果に基づいて音声ファイルをセグメントに分割する。
 subprocess で ffmpeg を直接呼び出し（外部ライブラリ依存なし）
+
+Version: 2.0 - Python 3.12 compatible
 """
 
 import json

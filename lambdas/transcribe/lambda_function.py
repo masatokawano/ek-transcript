@@ -2,6 +2,8 @@
 Transcribe Lambda Function
 
 faster-whisper を使用して音声セグメントを文字起こしする。
+
+Version: 2.0 - Python 3.12 compatible
 """
 
 import logging

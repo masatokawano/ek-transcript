@@ -2,6 +2,8 @@
 Diarize Lambda Function
 
 pyannote.audio を使用して話者分離を実行する。
+
+Version: 2.0 - Python 3.12 compatible
 """
 
 import json

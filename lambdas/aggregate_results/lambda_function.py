@@ -2,6 +2,8 @@
 AggregateResults Lambda Function
 
 文字起こし結果を統合して1つのJSONファイルにまとめる。
+
+Version: 2.0 - Python 3.12 compatible
 """
 
 import json

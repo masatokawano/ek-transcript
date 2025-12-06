@@ -2,6 +2,8 @@
 ExtractAudio Lambda Function
 
 動画ファイルから音声を抽出し、16kHz モノラル WAV に変換する。
+
+Version: 2.0 - Python 3.12 compatible
 """
 
 import logging
