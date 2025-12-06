@@ -61,8 +61,9 @@ def get_pipeline() -> Any:
         from pyannote.audio.core.task import Problem, Resolution, Specifications
 
         # PyTorch 2.6+ requires explicit safe_globals for pyannote models
+        # TorchVersion is needed for model checkpoint loading
         torch.serialization.add_safe_globals(
-            [Specifications, Problem, Resolution, Introspection]
+            [Specifications, Problem, Resolution, Introspection, torch.torch_version.TorchVersion]
         )
 
         logger.info("Initializing pyannote pipeline from pre-downloaded model...")
