@@ -12,5 +12,5 @@ torch.serialization.add_safe_globals([Specifications, Problem, Resolution, Intro
 from pyannote.audio import Pipeline
 
 hf_token = os.environ.get("HF_TOKEN", "")
-Pipeline.from_pretrained("pyannote/speaker-diarization-community-1", token=hf_token)
+Pipeline.from_pretrained("pyannote/speaker-diarization-3.1", token=hf_token)
 print("Model downloaded successfully")
