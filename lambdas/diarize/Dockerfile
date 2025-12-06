@@ -1,7 +1,7 @@
 FROM public.ecr.aws/lambda/python:3.11
 
-# Install system dependencies
-RUN yum install -y libsndfile
+# Install system dependencies (gcc-c++ required for contourpy build)
+RUN yum install -y libsndfile gcc-c++
 
 # Copy requirements and install
 COPY requirements.txt .
