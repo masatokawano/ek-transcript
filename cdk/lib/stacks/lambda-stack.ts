@@ -17,7 +17,9 @@ export interface LambdaStackProps extends cdk.StackProps {
 
 export class LambdaStack extends cdk.Stack {
   public readonly extractAudioFn: lambda.Function;
+  public readonly chunkAudioFn: lambda.Function;
   public readonly diarizeFn: lambda.Function;
+  public readonly mergeSpeakersFn: lambda.Function;
   public readonly splitBySpeakerFn: lambda.Function;
   public readonly transcribeFn: lambda.Function;
   public readonly aggregateResultsFn: lambda.Function;
@@ -72,6 +74,31 @@ export class LambdaStack extends cdk.Stack {
       }
     );
 
+    // ChunkAudio Lambda - for parallel diarization
+    this.chunkAudioFn = new lambda.DockerImageFunction(
+      this,
+      "ChunkAudioFn",
+      {
+        functionName: `ek-transcript-chunk-audio-${environment}`,
+        code: lambda.DockerImageCode.fromImageAsset(
+          path.join(lambdasPath, "chunk_audio")
+        ),
+        memorySize: 3008,
+        timeout: cdk.Duration.minutes(15),
+        ephemeralStorageSize: cdk.Size.mebibytes(10240),
+        environment: {
+          INPUT_BUCKET: inputBucket.bucketName,
+          OUTPUT_BUCKET: outputBucket.bucketName,
+          CHUNK_DURATION: "480", // 8 minutes
+          OVERLAP_DURATION: "30", // 30 seconds
+          MIN_CHUNK_DURATION: "60", // 1 minute
+          ENVIRONMENT: environment,
+        },
+        role: lambdaRole,
+        architecture: lambda.Architecture.X86_64,
+      }
+    );
+
     // Diarize Lambda (larger memory for pyannote)
     // HF_TOKEN is required at build time - set via environment variable
     const hfToken = process.env.HF_TOKEN || "";
@@ -99,6 +126,28 @@ export class LambdaStack extends cdk.Stack {
       architecture: lambda.Architecture.X86_64,
     });
     huggingfaceSecret.grantRead(this.diarizeFn);
+
+    // MergeSpeakers Lambda - for merging parallel diarization results
+    this.mergeSpeakersFn = new lambda.DockerImageFunction(
+      this,
+      "MergeSpeakersFn",
+      {
+        functionName: `ek-transcript-merge-speakers-${environment}`,
+        code: lambda.DockerImageCode.fromImageAsset(
+          path.join(lambdasPath, "merge_speakers")
+        ),
+        memorySize: 3008,
+        timeout: cdk.Duration.minutes(5),
+        environment: {
+          INPUT_BUCKET: inputBucket.bucketName,
+          OUTPUT_BUCKET: outputBucket.bucketName,
+          SIMILARITY_THRESHOLD: "0.75", // Cosine similarity threshold
+          ENVIRONMENT: environment,
+        },
+        role: lambdaRole,
+        architecture: lambda.Architecture.X86_64,
+      }
+    );
 
     // SplitBySpeaker Lambda
     this.splitBySpeakerFn = new lambda.DockerImageFunction(
@@ -194,9 +243,19 @@ export class LambdaStack extends cdk.Stack {
       exportName: `${id}-ExtractAudioFnArn`,
     });
 
+    new cdk.CfnOutput(this, "ChunkAudioFnArn", {
+      value: this.chunkAudioFn.functionArn,
+      exportName: `${id}-ChunkAudioFnArn`,
+    });
+
     new cdk.CfnOutput(this, "DiarizeFnArn", {
       value: this.diarizeFn.functionArn,
       exportName: `${id}-DiarizeFnArn`,
+    });
+
+    new cdk.CfnOutput(this, "MergeSpeakersFnArn", {
+      value: this.mergeSpeakersFn.functionArn,
+      exportName: `${id}-MergeSpeakersFnArn`,
     });
 
     new cdk.CfnOutput(this, "SplitBySpeakerFnArn", {

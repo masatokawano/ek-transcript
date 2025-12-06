@@ -14,7 +14,9 @@ export interface StepFunctionsStackProps extends cdk.StackProps {
   inputBucket: s3.IBucket;
   outputBucket: s3.IBucket;
   extractAudioFn: lambda.IFunction;
+  chunkAudioFn: lambda.IFunction;
   diarizeFn: lambda.IFunction;
+  mergeSpeakersFn: lambda.IFunction;
   splitBySpeakerFn: lambda.IFunction;
   transcribeFn: lambda.IFunction;
   aggregateResultsFn: lambda.IFunction;
@@ -32,7 +34,9 @@ export class StepFunctionsStack extends cdk.Stack {
       inputBucket,
       outputBucket,
       extractAudioFn,
+      chunkAudioFn,
       diarizeFn,
+      mergeSpeakersFn,
       splitBySpeakerFn,
       transcribeFn,
       aggregateResultsFn,
@@ -75,8 +79,25 @@ export class StepFunctionsStack extends cdk.Stack {
       resultPath: "$.error",
     });
 
-    // Diarize Task
-    const diarizeTask = new tasks.LambdaInvoke(this, "Diarize", {
+    // ChunkAudio Task - Split audio into chunks for parallel processing
+    const chunkAudioTask = new tasks.LambdaInvoke(this, "ChunkAudio", {
+      lambdaFunction: chunkAudioFn,
+      outputPath: "$.Payload",
+      retryOnServiceExceptions: true,
+    });
+    chunkAudioTask.addRetry({
+      errors: ["States.ALL"],
+      maxAttempts: 2,
+      interval: cdk.Duration.seconds(5),
+      backoffRate: 2,
+    });
+    chunkAudioTask.addCatch(handleError, {
+      errors: ["States.ALL"],
+      resultPath: "$.error",
+    });
+
+    // Diarize Task (single chunk)
+    const diarizeTask = new tasks.LambdaInvoke(this, "DiarizeChunk", {
       lambdaFunction: diarizeFn,
       outputPath: "$.Payload",
       retryOnServiceExceptions: true,
@@ -87,7 +108,43 @@ export class StepFunctionsStack extends cdk.Stack {
       interval: cdk.Duration.seconds(10),
       backoffRate: 2,
     });
-    diarizeTask.addCatch(handleError, {
+
+    // Map state for parallel diarization of chunks
+    const diarizeChunks = new sfn.Map(this, "DiarizeChunks", {
+      itemsPath: "$.chunks",
+      maxConcurrency: 5, // Limit concurrent diarization to prevent resource exhaustion
+      parameters: {
+        "bucket.$": "$.bucket",
+        "audio_key.$": "$.audio_key",
+        "chunk.$": "$$.Map.Item.Value",
+      },
+      resultPath: "$.chunk_results",
+    });
+    diarizeChunks.itemProcessor(diarizeTask);
+    diarizeChunks.addCatch(handleError, {
+      errors: ["States.ALL"],
+      resultPath: "$.error",
+    });
+
+    // MergeSpeakers Task - Merge parallel diarization results
+    const mergeSpeakersTask = new tasks.LambdaInvoke(this, "MergeSpeakers", {
+      lambdaFunction: mergeSpeakersFn,
+      payload: sfn.TaskInput.fromObject({
+        "bucket.$": "$.bucket",
+        "audio_key.$": "$.audio_key",
+        "chunk_results.$": "$.chunk_results",
+        "chunk_config.$": "$.chunk_config",
+      }),
+      outputPath: "$.Payload",
+      retryOnServiceExceptions: true,
+    });
+    mergeSpeakersTask.addRetry({
+      errors: ["States.ALL"],
+      maxAttempts: 2,
+      interval: cdk.Duration.seconds(5),
+      backoffRate: 2,
+    });
+    mergeSpeakersTask.addCatch(handleError, {
       errors: ["States.ALL"],
       resultPath: "$.error",
     });
@@ -181,9 +238,12 @@ export class StepFunctionsStack extends cdk.Stack {
       comment: "Transcription pipeline completed successfully",
     });
 
-    // Define workflow
+    // Define workflow with parallel diarization
+    // Flow: ExtractAudio → ChunkAudio → DiarizeChunks(Map) → MergeSpeakers → SplitBySpeaker → TranscribeSegments(Map) → AggregateResults → LLMAnalysis
     const definition = extractAudioTask
-      .next(diarizeTask)
+      .next(chunkAudioTask)
+      .next(diarizeChunks)
+      .next(mergeSpeakersTask)
       .next(splitBySpeakerTask)
       .next(transcribeSegments)
       .next(aggregateResultsTask)
