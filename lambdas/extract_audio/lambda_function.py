@@ -69,7 +69,7 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     Args:
         event: Lambda イベント
             - bucket: S3 バケット名
-            - key: S3 オブジェクトキー（動画ファイル）
+            - key or video_key: S3 オブジェクトキー（動画ファイル）
         context: Lambda コンテキスト
 
     Returns:
@@ -82,7 +82,9 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
 
     # イベントからパラメータを取得
     bucket = event["bucket"]
-    key = event["key"]
+    key = event.get("key") or event.get("video_key")
+    if not key:
+        raise ValueError("Either 'key' or 'video_key' is required")
 
     # ローカルパス
     local_video = "/tmp/input.mp4"
