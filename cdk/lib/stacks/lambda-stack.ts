@@ -61,6 +61,7 @@ export class LambdaStack extends cdk.Stack {
         ),
         memorySize: 3008,
         timeout: cdk.Duration.minutes(15),
+        ephemeralStorageSize: cdk.Size.mebibytes(10240),
         environment: {
           INPUT_BUCKET: inputBucket.bucketName,
           OUTPUT_BUCKET: outputBucket.bucketName,
@@ -79,6 +80,7 @@ export class LambdaStack extends cdk.Stack {
       ),
       memorySize: 10240, // Max Lambda memory for pyannote
       timeout: cdk.Duration.minutes(15),
+      ephemeralStorageSize: cdk.Size.mebibytes(10240),
       environment: {
         INPUT_BUCKET: inputBucket.bucketName,
         OUTPUT_BUCKET: outputBucket.bucketName,
@@ -101,6 +103,7 @@ export class LambdaStack extends cdk.Stack {
         ),
         memorySize: 3008,
         timeout: cdk.Duration.minutes(15),
+        ephemeralStorageSize: cdk.Size.mebibytes(10240),
         environment: {
           INPUT_BUCKET: inputBucket.bucketName,
           OUTPUT_BUCKET: outputBucket.bucketName,

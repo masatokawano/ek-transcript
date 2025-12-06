@@ -1,7 +1,7 @@
 """
 LLMAnalysis Lambda Function
 
-OpenAI API (gpt-4o-mini) を使用して文字起こし結果を分析する。
+OpenAI API (gpt-5-mini) を使用して文字起こし結果を分析する。
 
 Version: 2.0 - Python 3.12 compatible
 """
