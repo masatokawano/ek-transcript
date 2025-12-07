@@ -4,12 +4,17 @@ export const GET_INTERVIEW = /* GraphQL */ `
       interview_id
       segment
       created_at
+      status
       analysis_key
       transcript_key
       video_key
       diarization_key
       total_score
       user_id
+      file_name
+      file_size
+      execution_arn
+      updated_at
     }
   }
 `;
@@ -21,12 +26,14 @@ export const LIST_INTERVIEWS = /* GraphQL */ `
         interview_id
         segment
         created_at
+        status
         analysis_key
         transcript_key
         video_key
         diarization_key
         total_score
         user_id
+        file_name
       }
       nextToken
     }

@@ -5,12 +5,17 @@ type Interview @aws_cognito_user_pools {
   interview_id: ID!
   segment: String!
   created_at: AWSDateTime!
-  analysis_key: String!
-  transcript_key: String!
+  status: String
+  analysis_key: String
+  transcript_key: String
   video_key: String
   diarization_key: String
   total_score: Int
   user_id: String
+  file_name: String
+  file_size: Int
+  execution_arn: String
+  updated_at: AWSDateTime
 }
 
 type InterviewConnection @aws_cognito_user_pools {
@@ -67,17 +72,22 @@ type Mutation {
 input CreateInterviewInput {
   interview_id: ID!
   segment: String!
-  analysis_key: String!
-  transcript_key: String!
+  status: String
+  analysis_key: String
+  transcript_key: String
   video_key: String
   diarization_key: String
   total_score: Int
   user_id: String
+  file_name: String
+  file_size: Int
+  execution_arn: String
 }
 
 input UpdateInterviewInput {
   interview_id: ID!
   segment: String
+  status: String
   analysis_key: String
   transcript_key: String
   video_key: String

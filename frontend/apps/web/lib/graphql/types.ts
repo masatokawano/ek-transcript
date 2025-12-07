@@ -2,12 +2,17 @@ export interface Interview {
   interview_id: string;
   segment: string;
   created_at: string;
-  analysis_key: string;
-  transcript_key: string;
+  status?: string | null;
+  analysis_key?: string | null;
+  transcript_key?: string | null;
   video_key?: string | null;
   diarization_key?: string | null;
   total_score?: number | null;
   user_id?: string | null;
+  file_name?: string | null;
+  file_size?: number | null;
+  execution_arn?: string | null;
+  updated_at?: string | null;
 }
 
 export interface InterviewConnection {
