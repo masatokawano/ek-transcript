@@ -26,6 +26,7 @@ export class StorageStack extends cdk.Stack {
       encryption: s3.BucketEncryption.S3_MANAGED,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       versioned: false,
+      eventBridgeEnabled: true, // Enable EventBridge for S3 events
       removalPolicy:
         environment === "prod"
           ? cdk.RemovalPolicy.RETAIN

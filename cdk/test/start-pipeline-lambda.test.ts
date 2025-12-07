@@ -119,4 +119,47 @@ describe("Start Pipeline Lambda", () => {
 
     await expect(handler(event)).rejects.toThrow("STATE_MACHINE_ARN");
   });
+
+  it("should handle EventBridge S3 event format", async () => {
+    const event = {
+      source: "aws.s3",
+      "detail-type": "Object Created",
+      detail: {
+        bucket: {
+          name: "test-bucket",
+        },
+        object: {
+          key: "uploads/user-789/2025-12-08/HEMS/video.mp4",
+          size: 3072000,
+        },
+      },
+    };
+
+    const result = await handler(event);
+
+    expect(result.statusCode).toBe(200);
+    expect(mockSend).toHaveBeenCalled();
+    expect(result.body).toContain("user-789");
+  });
+
+  it("should skip non-video files in EventBridge format", async () => {
+    const event = {
+      source: "aws.s3",
+      "detail-type": "Object Created",
+      detail: {
+        bucket: {
+          name: "test-bucket",
+        },
+        object: {
+          key: "uploads/user-123/2025-12-08/HEMS/document.pdf",
+          size: 1024,
+        },
+      },
+    };
+
+    const result = await handler(event);
+
+    expect(result.statusCode).toBe(200);
+    expect(result.body).toContain("skipped");
+  });
 });

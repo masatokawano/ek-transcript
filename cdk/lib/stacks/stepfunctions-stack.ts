@@ -4,7 +4,6 @@ import * as tasks from "aws-cdk-lib/aws-stepfunctions-tasks";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as lambdaNodejs from "aws-cdk-lib/aws-lambda-nodejs";
 import * as s3 from "aws-cdk-lib/aws-s3";
-import * as s3n from "aws-cdk-lib/aws-s3-notifications";
 import * as events from "aws-cdk-lib/aws-events";
 import * as targets from "aws-cdk-lib/aws-events-targets";
 import * as logs from "aws-cdk-lib/aws-logs";
@@ -290,33 +289,25 @@ export class StepFunctionsStack extends cdk.Stack {
     // Grant Lambda permission to start Step Functions
     this.stateMachine.grantStartExecution(startPipelineLambda);
 
-    // Add S3 event notification to trigger Lambda on video upload
-    inputBucket.addEventNotification(
-      s3.EventType.OBJECT_CREATED,
-      new s3n.LambdaDestination(startPipelineLambda),
-      {
-        prefix: "uploads/",
-        suffix: ".mp4",
-      }
-    );
+    // EventBridge rule to trigger Lambda on S3 video upload (avoids circular dependency)
+    const s3UploadRule = new events.Rule(this, "S3UploadRule", {
+      ruleName: `ek-transcript-s3-upload-${environment}`,
+      eventPattern: {
+        source: ["aws.s3"],
+        detailType: ["Object Created"],
+        detail: {
+          bucket: {
+            name: [inputBucket.bucketName],
+          },
+          object: {
+            key: [{ prefix: "uploads/" }],
+          },
+        },
+      },
+    });
 
-    inputBucket.addEventNotification(
-      s3.EventType.OBJECT_CREATED,
-      new s3n.LambdaDestination(startPipelineLambda),
-      {
-        prefix: "uploads/",
-        suffix: ".mov",
-      }
-    );
-
-    inputBucket.addEventNotification(
-      s3.EventType.OBJECT_CREATED,
-      new s3n.LambdaDestination(startPipelineLambda),
-      {
-        prefix: "uploads/",
-        suffix: ".webm",
-      }
-    );
+    // Add Lambda as target for S3 upload events
+    s3UploadRule.addTarget(new targets.LambdaFunction(startPipelineLambda));
 
     // EventBridge rule for completion notification
     const completionRule = new events.Rule(this, "CompletionRule", {

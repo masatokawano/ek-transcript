@@ -5,6 +5,7 @@ const sfnClient = new SFNClient({});
 
 const VIDEO_EXTENSIONS = [".mp4", ".mov", ".avi", ".webm", ".mkv"];
 
+// S3 Event Notification format
 interface S3Event {
   Records: Array<{
     s3: {
@@ -18,6 +19,23 @@ interface S3Event {
     };
   }>;
 }
+
+// EventBridge S3 event format
+interface EventBridgeS3Event {
+  source: string;
+  "detail-type": string;
+  detail: {
+    bucket: {
+      name: string;
+    };
+    object: {
+      key: string;
+      size: number;
+    };
+  };
+}
+
+type PipelineEvent = S3Event | EventBridgeS3Event;
 
 interface StartPipelineResponse {
   statusCode: number;
@@ -53,7 +71,29 @@ function parseS3Key(key: string): {
   };
 }
 
-export async function handler(event: S3Event): Promise<StartPipelineResponse> {
+function isEventBridgeEvent(event: PipelineEvent): event is EventBridgeS3Event {
+  return "source" in event && event.source === "aws.s3";
+}
+
+function extractS3Info(event: PipelineEvent): Array<{ bucket: string; key: string; size: number }> {
+  if (isEventBridgeEvent(event)) {
+    // EventBridge format
+    return [{
+      bucket: event.detail.bucket.name,
+      key: event.detail.object.key,
+      size: event.detail.object.size,
+    }];
+  } else {
+    // S3 Event Notification format
+    return event.Records.map((record) => ({
+      bucket: record.s3.bucket.name,
+      key: decodeURIComponent(record.s3.object.key.replace(/\+/g, " ")),
+      size: record.s3.object.size,
+    }));
+  }
+}
+
+export async function handler(event: PipelineEvent): Promise<StartPipelineResponse> {
   const stateMachineArn = process.env.STATE_MACHINE_ARN;
 
   if (!stateMachineArn) {
@@ -61,11 +101,9 @@ export async function handler(event: S3Event): Promise<StartPipelineResponse> {
   }
 
   const results: string[] = [];
+  const s3Objects = extractS3Info(event);
 
-  for (const record of event.Records) {
-    const bucket = record.s3.bucket.name;
-    const key = decodeURIComponent(record.s3.object.key.replace(/\+/g, " "));
-    const size = record.s3.object.size;
+  for (const { bucket, key, size } of s3Objects) {
 
     // Skip non-video files
     if (!isVideoFile(key)) {
