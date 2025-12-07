@@ -1,0 +1,266 @@
+.page {
+  --gray-rgb: 0, 0, 0;
+  --gray-alpha-200: rgba(var(--gray-rgb), 0.08);
+  --gray-alpha-100: rgba(var(--gray-rgb), 0.05);
+
+  min-height: 100svh;
+  padding: 24px;
+  font-synthesis: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .page {
+    --gray-rgb: 255, 255, 255;
+    --gray-alpha-200: rgba(var(--gray-rgb), 0.145);
+    --gray-alpha-100: rgba(var(--gray-rgb), 0.06);
+  }
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--gray-alpha-200);
+}
+
+.title {
+  font-family: var(--font-geist-sans);
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.userInfo {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.email {
+  font-family: var(--font-geist-mono);
+  font-size: 14px;
+  color: var(--foreground);
+  opacity: 0.7;
+}
+
+.signOutButton {
+  appearance: none;
+  border-radius: 8px;
+  height: 36px;
+  padding: 0 16px;
+  font-family: var(--font-geist-sans);
+  border: 1px solid var(--gray-alpha-200);
+  background: transparent;
+  color: var(--foreground);
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.signOutButton:hover {
+  background: var(--gray-alpha-100);
+}
+
+.content {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.interviewList {
+  display: grid;
+  gap: 16px;
+}
+
+.interviewCard {
+  border: 1px solid var(--gray-alpha-200);
+  border-radius: 12px;
+  padding: 20px;
+  background: var(--gray-alpha-100);
+  transition: background 0.2s;
+}
+
+.interviewCard:hover {
+  background: var(--gray-alpha-200);
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.cardTitle {
+  font-family: var(--font-geist-sans);
+  font-size: 18px;
+  font-weight: 500;
+  margin: 0;
+}
+
+.segment {
+  font-family: var(--font-geist-mono);
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: var(--gray-alpha-200);
+}
+
+.cardMeta {
+  font-family: var(--font-geist-mono);
+  font-size: 12px;
+  opacity: 0.7;
+  margin-bottom: 8px;
+}
+
+.score {
+  display: inline-block;
+  font-family: var(--font-geist-sans);
+  font-size: 14px;
+  font-weight: 500;
+  padding: 4px 12px;
+  border-radius: 16px;
+  background: var(--gray-alpha-200);
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+  font-family: var(--font-geist-sans);
+  font-size: 16px;
+  opacity: 0.7;
+}
+
+.error {
+  padding: 16px;
+  border-radius: 8px;
+  background: var(--gray-alpha-100);
+  color: var(--foreground);
+  font-family: var(--font-geist-mono);
+  font-size: 14px;
+}
+
+.empty {
+  text-align: center;
+  padding: 48px 24px;
+  font-family: var(--font-geist-sans);
+  font-size: 16px;
+  opacity: 0.7;
+}
+
+.authContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100svh;
+  padding: 24px;
+}
+
+.authBox {
+  max-width: 400px;
+  width: 100%;
+  padding: 32px;
+  border: 1px solid var(--gray-alpha-200);
+  border-radius: 12px;
+  background: var(--gray-alpha-100);
+}
+
+.authTitle {
+  font-family: var(--font-geist-sans);
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0 0 24px 0;
+  text-align: center;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.inputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.label {
+  font-family: var(--font-geist-sans);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.input {
+  height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--gray-alpha-200);
+  border-radius: 8px;
+  font-family: var(--font-geist-mono);
+  font-size: 14px;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--foreground);
+}
+
+.submitButton {
+  height: 44px;
+  border-radius: 8px;
+  border: none;
+  background: var(--foreground);
+  color: var(--background);
+  font-family: var(--font-geist-sans);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.submitButton:hover {
+  opacity: 0.9;
+}
+
+.submitButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.switchAuth {
+  margin-top: 16px;
+  text-align: center;
+  font-family: var(--font-geist-sans);
+  font-size: 14px;
+}
+
+.switchAuth button {
+  background: none;
+  border: none;
+  color: var(--foreground);
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: inherit;
+}
+
+@media (max-width: 600px) {
+  .page {
+    padding: 16px;
+  }
+
+  .header {
+    flex-direction: column;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  .userInfo {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
