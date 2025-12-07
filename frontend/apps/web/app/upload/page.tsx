@@ -36,8 +36,8 @@ function UploadForm() {
       setUploadStatus("error");
       return;
     }
-    if (selectedFile.size > 500 * 1024 * 1024) {
-      setStatusMessage("ファイルサイズは500MB以下にしてください");
+    if (selectedFile.size > 3 * 1024 * 1024 * 1024) {
+      setStatusMessage("ファイルサイズは3GB以下にしてください");
       setUploadStatus("error");
       return;
     }
@@ -178,7 +178,7 @@ function UploadForm() {
           {file ? file.name : "ファイルをドロップまたはクリックして選択"}
         </h2>
         <p className={styles.dropzoneText}>
-          MP4, MOV, AVI, WebM (最大500MB)
+          MP4, MOV, AVI, WebM (最大3GB)
         </p>
       </div>
 
