@@ -130,7 +130,7 @@ def analyze_transcript_structured(transcript: list[dict]) -> HEMSInterviewData:
             },
         ],
         response_format=HEMSInterviewData,
-        temperature=0.1,  # 構造化出力は低めの temperature が推奨
+        # gpt-5-mini は temperature パラメータをサポートしていない（デフォルト値 1 のみ）
     )
 
     message = completion.choices[0].message
