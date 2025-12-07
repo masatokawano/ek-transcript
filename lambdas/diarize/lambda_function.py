@@ -10,6 +10,21 @@ Step Functions には軽量なレスポンスのみ返す（256KB 制限対策�
 Version: 2.0 - チャンク並列処理対応
 """
 
+import torch
+
+# PyTorch 2.6+ の weights_only=True デフォルトを無効化
+# pyannote の HuggingFace チェックポイントは信頼できるソースなので問題なし
+_orig_torch_load = torch.load
+
+
+def _torch_load_legacy(*args, **kwargs):
+    """torch.load を常に weights_only=False で呼び出す"""
+    kwargs["weights_only"] = False
+    return _orig_torch_load(*args, **kwargs)
+
+
+torch.load = _torch_load_legacy  # pyannote import 前に適用
+
 import json
 import logging
 import os
@@ -18,7 +33,6 @@ from typing import Any
 import boto3
 import numpy as np
 import soundfile as sf
-import torch
 
 # ロガー設定
 logger = logging.getLogger()
@@ -57,18 +71,9 @@ def get_pipeline() -> Any:
 
     if _pipeline is None:
         from pyannote.audio import Pipeline
-        from pyannote.audio.core.model import Introspection
-        from pyannote.audio.core.task import Problem, Resolution, Specifications
-
-        # PyTorch 2.6+ requires explicit safe_globals for pyannote models
-        # TorchVersion is needed for model checkpoint loading
-        torch.serialization.add_safe_globals(
-            [Specifications, Problem, Resolution, Introspection, torch.torch_version.TorchVersion]
-        )
 
         logger.info("Initializing pyannote pipeline from pre-downloaded model...")
         hf_token = get_hf_token()
-        # モデルは /opt/huggingface にプリダウンロード済み
         _pipeline = Pipeline.from_pretrained(
             "pyannote/speaker-diarization-3.1",
             token=hf_token,
@@ -79,19 +84,17 @@ def get_pipeline() -> Any:
 
 
 def get_embedding_model() -> Any:
-    """pyannote 埋め込みモデルを取得（シングルトン）"""
+    """pyannote 埋め込みモデルを取得（シングルトン）- pyannote.audio 4.x 対応"""
     global _embedding_model
 
     if _embedding_model is None:
-        from pyannote.audio import Inference
+        from pyannote.audio import Inference, Model
 
         logger.info("Initializing embedding model...")
         hf_token = get_hf_token()
-        _embedding_model = Inference(
-            "pyannote/embedding",
-            token=hf_token,
-            window="whole",
-        )
+        # pyannote.audio 4.x: Model.from_pretrained() でモデルをロードしてから Inference に渡す
+        model = Model.from_pretrained("pyannote/embedding", token=hf_token)
+        _embedding_model = Inference(model, window="whole")
         logger.info("Embedding model initialized")
 
     return _embedding_model
