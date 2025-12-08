@@ -52,7 +52,7 @@ class TestDynamoDBSave:
     def mock_dynamodb(self) -> Generator[MagicMock, None, None]:
         """DynamoDB クライアントのモック"""
         with patch.object(lambda_module, "dynamodb") as mock:
-            mock.put_item.return_value = {}
+            mock.update_item.return_value = {}
             yield mock
 
     @pytest.fixture
@@ -104,20 +104,20 @@ class TestDynamoDBSave:
 
             result = lambda_module.lambda_handler(event, context)
 
-            # DynamoDB put_item が呼ばれたことを確認
-            mock_dynamodb.put_item.assert_called_once()
+            # DynamoDB update_item が呼ばれたことを確認
+            mock_dynamodb.update_item.assert_called_once()
 
             # 結果に interview_id が含まれること
             assert result["status"] == "completed"
             assert result["structured"] is True
 
-    def test_dynamodb_item_contains_required_fields(
+    def test_dynamodb_update_contains_required_fields(
         self,
         mock_s3: MagicMock,
         mock_dynamodb: MagicMock,
         mock_openai_structured: MagicMock,
     ) -> None:
-        """DynamoDB に保存されるアイテムに必須フィールドが含まれること"""
+        """DynamoDB update に必須フィールドが含まれること"""
         with patch.object(lambda_module, "INTERVIEWS_TABLE_NAME", "test-interviews-table"):
             event = {
                 "bucket": "test-bucket",
@@ -131,23 +131,27 @@ class TestDynamoDBSave:
 
             lambda_module.lambda_handler(event, context)
 
-            # put_item の引数を検証
-            call_args = mock_dynamodb.put_item.call_args
-            item = call_args.kwargs.get("Item", call_args[1].get("Item", {}))
+            # update_item の引数を検証
+            call_args = mock_dynamodb.update_item.call_args
+            kwargs = call_args.kwargs if call_args.kwargs else call_args[1]
 
-            # 必須フィールドが含まれていること
-            assert "interview_id" in item
-            assert "segment" in item
-            assert "created_at" in item
-            assert "analysis_key" in item
+            # Keyにinterview_idが含まれていること
+            assert "Key" in kwargs
+            assert "interview_id" in kwargs["Key"]
 
-    def test_dynamodb_save_includes_s3_links(
+            # UpdateExpressionに必須フィールドが含まれていること
+            update_expr = kwargs.get("UpdateExpression", "")
+            assert "analysis_key" in update_expr
+            assert "transcript_key" in update_expr
+            assert "updated_at" in update_expr
+
+    def test_dynamodb_update_includes_s3_links(
         self,
         mock_s3: MagicMock,
         mock_dynamodb: MagicMock,
         mock_openai_structured: MagicMock,
     ) -> None:
-        """DynamoDB に S3 リンクが保存されること"""
+        """DynamoDB update に S3 リンクが含まれること"""
         with patch.object(lambda_module, "INTERVIEWS_TABLE_NAME", "test-interviews-table"):
             event = {
                 "bucket": "test-bucket",
@@ -161,14 +165,14 @@ class TestDynamoDBSave:
 
             lambda_module.lambda_handler(event, context)
 
-            call_args = mock_dynamodb.put_item.call_args
-            item = call_args.kwargs.get("Item", call_args[1].get("Item", {}))
+            call_args = mock_dynamodb.update_item.call_args
+            kwargs = call_args.kwargs if call_args.kwargs else call_args[1]
+            expression_values = kwargs.get("ExpressionAttributeValues", {})
 
             # S3 リンクフィールドが含まれていること
-            assert "transcript_key" in item
-            # video_key と diarization_key はオプションだが渡されていれば保存される
-            assert "video_key" in item
-            assert "diarization_key" in item
+            assert ":transcript_key" in expression_values
+            # diarization_key はオプションだが渡されていれば保存される
+            assert ":diarization_key" in expression_values
 
     def test_no_dynamodb_save_when_table_not_configured(
         self,
@@ -176,7 +180,7 @@ class TestDynamoDBSave:
         mock_dynamodb: MagicMock,
         mock_openai_structured: MagicMock,
     ) -> None:
-        """INTERVIEWS_TABLE_NAME が未設定の場合は DynamoDB 保存をスキップ"""
+        """INTERVIEWS_TABLE_NAME が未設定の場合は DynamoDB 更新をスキップ"""
         with patch.object(lambda_module, "INTERVIEWS_TABLE_NAME", ""):
             event = {
                 "bucket": "test-bucket",
@@ -187,8 +191,8 @@ class TestDynamoDBSave:
 
             result = lambda_module.lambda_handler(event, context)
 
-            # DynamoDB put_item が呼ばれないこと
-            mock_dynamodb.put_item.assert_not_called()
+            # DynamoDB update_item が呼ばれないこと
+            mock_dynamodb.update_item.assert_not_called()
 
             # 分析は成功すること
             assert result["status"] == "completed"

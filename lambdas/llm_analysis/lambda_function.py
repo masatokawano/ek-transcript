@@ -189,17 +189,19 @@ def save_to_dynamodb(
     segment: str,
     analysis_key: str,
     transcript_key: str,
+    total_score: int | None = None,
     video_key: str | None = None,
     diarization_key: str | None = None,
 ) -> None:
     """
-    分析結果を DynamoDB に保存
+    分析結果を DynamoDB に更新（既存レコードを保持）
 
     Args:
         interview_id: インタビュー ID
         segment: セグメント (A/B/C/D)
         analysis_key: 分析結果の S3 キー
         transcript_key: 文字起こしファイルの S3 キー
+        total_score: 総合スコア（オプション）
         video_key: 動画ファイルの S3 キー（オプション）
         diarization_key: 話者分離ファイルの S3 キー（オプション）
     """
@@ -207,24 +209,49 @@ def save_to_dynamodb(
         logger.info("INTERVIEWS_TABLE_NAME not configured, skipping DynamoDB save")
         return
 
-    created_at = datetime.now(timezone.utc).isoformat()
+    updated_at = datetime.now(timezone.utc).isoformat()
 
-    item: dict[str, Any] = {
-        "interview_id": {"S": interview_id},
-        "segment": {"S": segment},
-        "created_at": {"S": created_at},
-        "analysis_key": {"S": analysis_key},
-        "transcript_key": {"S": transcript_key},
+    # UpdateExpression を動的に構築
+    update_parts = [
+        "analysis_key = :analysis_key",
+        "transcript_key = :transcript_key",
+        "updated_at = :updated_at",
+        "#status = :status",
+        "progress = :progress",
+        "current_step = :current_step",
+    ]
+    expression_values: dict[str, Any] = {
+        ":analysis_key": {"S": analysis_key},
+        ":transcript_key": {"S": transcript_key},
+        ":updated_at": {"S": updated_at},
+        ":status": {"S": "completed"},
+        ":progress": {"N": "100"},
+        ":current_step": {"S": "completed"},
     }
+    expression_names = {"#status": "status"}
 
-    if video_key:
-        item["video_key"] = {"S": video_key}
+    # セグメントを更新（HEMS からLLM分析結果のセグメントに更新しない - segment は入力時に設定されるため）
+    # segment フィールドはユーザー入力のセグメント種別なので更新しない
+
+    if total_score is not None:
+        update_parts.append("total_score = :total_score")
+        expression_values[":total_score"] = {"N": str(total_score)}
+
     if diarization_key:
-        item["diarization_key"] = {"S": diarization_key}
+        update_parts.append("diarization_key = :diarization_key")
+        expression_values[":diarization_key"] = {"S": diarization_key}
 
-    logger.info(f"Saving to DynamoDB table {INTERVIEWS_TABLE_NAME}: interview_id={interview_id}")
-    dynamodb.put_item(TableName=INTERVIEWS_TABLE_NAME, Item=item)
-    logger.info("Successfully saved to DynamoDB")
+    update_expression = "SET " + ", ".join(update_parts)
+
+    logger.info(f"Updating DynamoDB table {INTERVIEWS_TABLE_NAME}: interview_id={interview_id}")
+    dynamodb.update_item(
+        TableName=INTERVIEWS_TABLE_NAME,
+        Key={"interview_id": {"S": interview_id}},
+        UpdateExpression=update_expression,
+        ExpressionAttributeValues=expression_values,
+        ExpressionAttributeNames=expression_names,
+    )
+    logger.info("Successfully updated DynamoDB")
 
 
 def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
@@ -288,13 +315,14 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             ContentType="application/json; charset=utf-8",
         )
 
-        # DynamoDB に保存（interview_id が指定されている場合）
+        # DynamoDB に更新（interview_id が指定されている場合）
         if interview_id:
             save_to_dynamodb(
                 interview_id=interview_id,
                 segment=structured_data.scoring.segment,
                 analysis_key=analysis_key,
                 transcript_key=transcript_key,
+                total_score=structured_data.scoring.total_score,
                 video_key=video_key,
                 diarization_key=diarization_key,
             )
