@@ -93,7 +93,7 @@ class TestDynamoDBSave:
     ) -> None:
         """構造化分析後に DynamoDB に保存されること"""
         # 環境変数を設定
-        with patch.object(lambda_module, "INTERVIEWS_TABLE_NAME", "test-interviews-table"):
+        with patch.object(lambda_module, "TABLE_NAME", "test-interviews-table"):
             event = {
                 "bucket": "test-bucket",
                 "transcript_key": "transcripts/test_transcript.json",
@@ -118,7 +118,7 @@ class TestDynamoDBSave:
         mock_openai_structured: MagicMock,
     ) -> None:
         """DynamoDB update に必須フィールドが含まれること"""
-        with patch.object(lambda_module, "INTERVIEWS_TABLE_NAME", "test-interviews-table"):
+        with patch.object(lambda_module, "TABLE_NAME", "test-interviews-table"):
             event = {
                 "bucket": "test-bucket",
                 "transcript_key": "transcripts/test_transcript.json",
@@ -152,7 +152,7 @@ class TestDynamoDBSave:
         mock_openai_structured: MagicMock,
     ) -> None:
         """DynamoDB update に S3 リンクが含まれること"""
-        with patch.object(lambda_module, "INTERVIEWS_TABLE_NAME", "test-interviews-table"):
+        with patch.object(lambda_module, "TABLE_NAME", "test-interviews-table"):
             event = {
                 "bucket": "test-bucket",
                 "transcript_key": "transcripts/test_transcript.json",
@@ -180,8 +180,8 @@ class TestDynamoDBSave:
         mock_dynamodb: MagicMock,
         mock_openai_structured: MagicMock,
     ) -> None:
-        """INTERVIEWS_TABLE_NAME が未設定の場合は DynamoDB 更新をスキップ"""
-        with patch.object(lambda_module, "INTERVIEWS_TABLE_NAME", ""):
+        """TABLE_NAME が未設定の場合は DynamoDB 更新をスキップ"""
+        with patch.object(lambda_module, "TABLE_NAME", ""):
             event = {
                 "bucket": "test-bucket",
                 "transcript_key": "transcripts/test_transcript.json",

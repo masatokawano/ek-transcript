@@ -33,7 +33,7 @@ dynamodb = boto3.client("dynamodb")
 OUTPUT_BUCKET = os.environ.get("OUTPUT_BUCKET", "")
 OPENAI_SECRET_ARN = os.environ.get("OPENAI_SECRET_ARN", "")
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-5-mini")
-INTERVIEWS_TABLE_NAME = os.environ.get("INTERVIEWS_TABLE_NAME", "")
+TABLE_NAME = os.environ.get("TABLE_NAME", "")
 
 # グローバル変数（コールドスタート対策）
 _openai_client = None
@@ -205,8 +205,8 @@ def save_to_dynamodb(
         video_key: 動画ファイルの S3 キー（オプション）
         diarization_key: 話者分離ファイルの S3 キー（オプション）
     """
-    if not INTERVIEWS_TABLE_NAME:
-        logger.info("INTERVIEWS_TABLE_NAME not configured, skipping DynamoDB save")
+    if not TABLE_NAME:
+        logger.info("TABLE_NAME not configured, skipping DynamoDB save")
         return
 
     updated_at = datetime.now(timezone.utc).isoformat()
@@ -243,9 +243,9 @@ def save_to_dynamodb(
 
     update_expression = "SET " + ", ".join(update_parts)
 
-    logger.info(f"Updating DynamoDB table {INTERVIEWS_TABLE_NAME}: interview_id={interview_id}")
+    logger.info(f"Updating DynamoDB table {TABLE_NAME}: interview_id={interview_id}")
     dynamodb.update_item(
-        TableName=INTERVIEWS_TABLE_NAME,
+        TableName=TABLE_NAME,
         Key={"interview_id": {"S": interview_id}},
         UpdateExpression=update_expression,
         ExpressionAttributeValues=expression_values,
