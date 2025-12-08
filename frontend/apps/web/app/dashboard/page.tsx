@@ -172,7 +172,11 @@ function InterviewList() {
     async function fetchInterviews() {
       try {
         const result = await listInterviews(20);
-        setInterviews(result.items);
+        // created_at で降順ソート（新しい順）
+        const sortedItems = [...result.items].sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+        setInterviews(sortedItems);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load interviews");
       } finally {
