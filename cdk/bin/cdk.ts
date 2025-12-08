@@ -6,6 +6,7 @@ import { LambdaStack } from "../lib/stacks/lambda-stack";
 import { StepFunctionsStack } from "../lib/stacks/stepfunctions-stack";
 import { AuthStack } from "../lib/stacks/auth-stack";
 import { AppSyncStack } from "../lib/stacks/appsync-stack";
+import { GoogleMeetStorageStack } from "../lib/stacks/google-meet-storage-stack";
 
 const app = new cdk.App();
 
@@ -81,6 +82,17 @@ const appSyncStack = new AppSyncStack(app, `EkTranscriptAppSync-${environment}`,
 });
 appSyncStack.addDependency(authStack);
 appSyncStack.addDependency(storageStack);
+
+// Google Meet Storage Stack
+const googleMeetStorageStack = new GoogleMeetStorageStack(
+  app,
+  `EkTranscriptGoogleMeetStorage-${environment}`,
+  {
+    env,
+    environment,
+    description: "DynamoDB tables and KMS key for Google Meet integration",
+  }
+);
 
 // Tags
 cdk.Tags.of(app).add("Project", "ek-transcript");
