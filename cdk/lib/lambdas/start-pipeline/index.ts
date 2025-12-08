@@ -1,11 +1,9 @@
 import { SFNClient, StartExecutionCommand } from "@aws-sdk/client-sfn";
-import { S3Client, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, PutCommand, GetCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import { randomUUID } from "crypto";
 
 const sfnClient = new SFNClient({});
-const s3Client = new S3Client({});
 const dynamoClient = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(dynamoClient);
 
@@ -126,19 +124,25 @@ export async function handler(event: PipelineEvent): Promise<StartPipelineRespon
     const interviewId = randomUUID();
     const createdAt = new Date().toISOString();
 
-    // Get original filename from S3 metadata
+    // Get original filename from DynamoDB upload metadata
     let originalFileName = keyFileName;
     try {
-      const headResponse = await s3Client.send(new HeadObjectCommand({
-        Bucket: bucket,
-        Key: key,
+      const uploadMetadataKey = `upload_${key}`;
+      const getResponse = await docClient.send(new GetCommand({
+        TableName: tableName,
+        Key: { interview_id: uploadMetadataKey },
       }));
-      if (headResponse.Metadata?.["original-filename"]) {
-        originalFileName = headResponse.Metadata["original-filename"];
+      if (getResponse.Item?.original_filename) {
+        originalFileName = getResponse.Item.original_filename;
+        // Clean up the temporary upload metadata record
+        await docClient.send(new DeleteCommand({
+          TableName: tableName,
+          Key: { interview_id: uploadMetadataKey },
+        }));
       }
     } catch (err) {
       // If metadata fetch fails, use key-based filename as fallback
-      console.warn(`Failed to get S3 metadata for ${key}:`, err);
+      console.warn(`Failed to get upload metadata for ${key}:`, err);
     }
 
     const input = {

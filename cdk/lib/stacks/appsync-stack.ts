@@ -35,6 +35,7 @@ export class AppSyncStack extends cdk.Stack {
         handler: "handler",
         environment: {
           BUCKET_NAME: inputBucket.bucketName,
+          TABLE_NAME: interviewsTable.tableName,
         },
         timeout: cdk.Duration.seconds(30),
         memorySize: 256,
@@ -48,6 +49,8 @@ export class AppSyncStack extends cdk.Stack {
 
     // Grant S3 permissions for upload
     inputBucket.grantPut(presignedUrlLambda);
+    // Grant DynamoDB permissions for storing upload metadata
+    interviewsTable.grantWriteData(presignedUrlLambda);
 
     // Video URL Lambda (Download/Playback)
     const videoUrlLambda = new lambdaNodejs.NodejsFunction(

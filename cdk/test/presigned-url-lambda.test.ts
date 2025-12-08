@@ -1,23 +1,39 @@
-import { handler, getVideoUrlHandler } from "../lib/lambdas/presigned-url";
+// Mock AWS SDK - must be before import
+const mockDynamoSend = jest.fn().mockResolvedValue({});
 
-// Mock AWS SDK
 jest.mock("@aws-sdk/client-s3", () => ({
   S3Client: jest.fn().mockImplementation(() => ({})),
   PutObjectCommand: jest.fn(),
   GetObjectCommand: jest.fn(),
 }));
 
+jest.mock("@aws-sdk/client-dynamodb", () => ({
+  DynamoDBClient: jest.fn().mockImplementation(() => ({})),
+}));
+
+jest.mock("@aws-sdk/lib-dynamodb", () => ({
+  DynamoDBDocumentClient: {
+    from: jest.fn().mockImplementation(() => ({
+      send: mockDynamoSend,
+    })),
+  },
+  PutCommand: jest.fn(),
+}));
+
 jest.mock("@aws-sdk/s3-request-presigner", () => ({
   getSignedUrl: jest.fn().mockResolvedValue("https://s3.example.com/presigned-url"),
 }));
+
+import { handler, getVideoUrlHandler } from "../lib/lambdas/presigned-url";
 
 describe("Presigned URL Lambda", () => {
   const OLD_ENV = process.env;
 
   beforeEach(() => {
-    jest.resetModules();
+    jest.clearAllMocks();
     process.env = { ...OLD_ENV };
     process.env.BUCKET_NAME = "test-bucket";
+    process.env.TABLE_NAME = "test-interviews-table";
     process.env.AWS_REGION = "ap-northeast-1";
   });
 

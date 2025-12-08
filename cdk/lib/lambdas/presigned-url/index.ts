@@ -1,8 +1,12 @@
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { randomUUID } from "crypto";
 
 const s3Client = new S3Client({});
+const dynamoClient = new DynamoDBClient({});
+const docClient = DynamoDBDocumentClient.from(dynamoClient);
 const VIDEO_URL_EXPIRATION_SECONDS = 3600; // 1 hour
 
 const ALLOWED_CONTENT_TYPES = [
@@ -65,22 +69,36 @@ export async function handler(event: AppSyncEvent): Promise<UploadUrlResponse> {
     throw new Error("BUCKET_NAME environment variable is not set");
   }
 
-  // Create presigned URL
-  // Note: user-id is not included in metadata because frontend must send
-  // matching headers for signature validation. User ID is captured from S3 key path.
+  const tableName = process.env.TABLE_NAME;
+  if (!tableName) {
+    throw new Error("TABLE_NAME environment variable is not set");
+  }
+
+  // Create presigned URL (no metadata to avoid signature mismatch)
   const command = new PutObjectCommand({
     Bucket: bucketName,
     Key: key,
     ContentType: contentType,
-    Metadata: {
-      segment: segment,
-      "original-filename": fileName,
-    },
   });
 
   const uploadUrl = await getSignedUrl(s3Client, command, {
     expiresIn: EXPIRATION_SECONDS,
   });
+
+  // Save upload metadata to DynamoDB for later retrieval by start-pipeline
+  // Using special prefix "upload_" to distinguish from interview records
+  await docClient.send(new PutCommand({
+    TableName: tableName,
+    Item: {
+      interview_id: `upload_${key}`,
+      segment: segment,
+      original_filename: fileName,
+      user_id: identity.sub,
+      s3_key: key,
+      created_at: new Date().toISOString(),
+      ttl: Math.floor(Date.now() / 1000) + 86400, // Expire in 24 hours
+    },
+  }));
 
   return {
     uploadUrl,

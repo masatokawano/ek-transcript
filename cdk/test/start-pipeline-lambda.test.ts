@@ -4,13 +4,18 @@ const mockSfnSend = jest.fn().mockResolvedValue({
   startDate: new Date(),
 });
 
-const mockDynamoSend = jest.fn().mockResolvedValue({});
-
-const mockS3Send = jest.fn().mockResolvedValue({
-  Metadata: {
-    "original-filename": "my-interview-video.mp4",
-    "segment": "HEMS",
-  },
+const mockDynamoSend = jest.fn().mockImplementation((command) => {
+  // Check if this is a GetCommand for upload metadata
+  if (command.constructor.name === 'GetCommand' || command.input?.Key?.interview_id?.startsWith('upload_')) {
+    return Promise.resolve({
+      Item: {
+        interview_id: "upload_uploads/user-123/2025-12-08/HEMS/test.mp4",
+        original_filename: "my-interview-video.mp4",
+        segment: "HEMS",
+      },
+    });
+  }
+  return Promise.resolve({});
 });
 
 jest.mock("@aws-sdk/client-sfn", () => ({
@@ -18,13 +23,6 @@ jest.mock("@aws-sdk/client-sfn", () => ({
     send: mockSfnSend,
   })),
   StartExecutionCommand: jest.fn(),
-}));
-
-jest.mock("@aws-sdk/client-s3", () => ({
-  S3Client: jest.fn().mockImplementation(() => ({
-    send: mockS3Send,
-  })),
-  HeadObjectCommand: jest.fn(),
 }));
 
 jest.mock("@aws-sdk/client-dynamodb", () => ({
@@ -38,6 +36,8 @@ jest.mock("@aws-sdk/lib-dynamodb", () => ({
     })),
   },
   PutCommand: jest.fn(),
+  GetCommand: jest.fn().mockImplementation((params) => ({ input: params })),
+  DeleteCommand: jest.fn(),
 }));
 
 import { handler } from "../lib/lambdas/start-pipeline";
@@ -51,13 +51,6 @@ describe("Start Pipeline Lambda", () => {
     process.env.STATE_MACHINE_ARN = "arn:aws:states:ap-northeast-1:123456789012:stateMachine:test-state-machine";
     process.env.TABLE_NAME = "test-interviews-table";
     process.env.AWS_REGION = "ap-northeast-1";
-    // Reset S3 mock to return original filename
-    mockS3Send.mockResolvedValue({
-      Metadata: {
-        "original-filename": "my-interview-video.mp4",
-        "segment": "HEMS",
-      },
-    });
   });
 
   afterAll(() => {
@@ -112,13 +105,7 @@ describe("Start Pipeline Lambda", () => {
     expect(result.body).toContain("EV");
   });
 
-  it("should read original filename from S3 metadata", async () => {
-    mockS3Send.mockResolvedValue({
-      Metadata: {
-        "original-filename": "original-interview-recording.mp4",
-      },
-    });
-
+  it("should read original filename from DynamoDB upload metadata", async () => {
     const event = {
       Records: [
         {
@@ -138,7 +125,8 @@ describe("Start Pipeline Lambda", () => {
     const result = await handler(event);
 
     expect(result.statusCode).toBe(200);
-    expect(mockS3Send).toHaveBeenCalled();
+    // DynamoDB should be called for GetCommand (metadata) and PutCommand (interview record)
+    expect(mockDynamoSend).toHaveBeenCalled();
   });
 
   it("should skip non-video files", async () => {

@@ -292,8 +292,7 @@ export class StepFunctionsStack extends cdk.Stack {
 
     // Grant Lambda permissions
     this.stateMachine.grantStartExecution(startPipelineLambda);
-    interviewsTable.grantWriteData(startPipelineLambda);
-    inputBucket.grantRead(startPipelineLambda); // Read S3 metadata for original filename
+    interviewsTable.grantReadWriteData(startPipelineLambda); // Read upload metadata, write interview records
 
     // EventBridge rule to trigger Lambda on S3 video upload (avoids circular dependency)
     const s3UploadRule = new events.Rule(this, "S3UploadRule", {
