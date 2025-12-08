@@ -13,6 +13,7 @@ export interface AppSyncStackProps extends cdk.StackProps {
   userPool: cognito.IUserPool;
   interviewsTable: dynamodb.ITable;
   inputBucket: s3.IBucket;
+  outputBucket: s3.IBucket;
 }
 
 export class AppSyncStack extends cdk.Stack {
@@ -22,7 +23,7 @@ export class AppSyncStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: AppSyncStackProps) {
     super(scope, id, props);
 
-    const { environment, userPool, interviewsTable, inputBucket } = props;
+    const { environment, userPool, interviewsTable, inputBucket, outputBucket } = props;
 
     // Presigned URL Lambda (Upload)
     const presignedUrlLambda = new lambdaNodejs.NodejsFunction(
@@ -63,6 +64,7 @@ export class AppSyncStack extends cdk.Stack {
         handler: "getVideoUrlHandler",
         environment: {
           BUCKET_NAME: inputBucket.bucketName,
+          OUTPUT_BUCKET_NAME: outputBucket.bucketName,
         },
         timeout: cdk.Duration.seconds(30),
         memorySize: 256,
@@ -74,8 +76,9 @@ export class AppSyncStack extends cdk.Stack {
       }
     );
 
-    // Grant S3 permissions for read
+    // Grant S3 permissions for read (input bucket for videos, output bucket for analysis/transcripts)
     inputBucket.grantRead(videoUrlLambda);
+    outputBucket.grantRead(videoUrlLambda);
 
     // GraphQL API with Cognito User Pool as default auth
     this.graphqlApi = new appsync.GraphqlApi(this, "GraphqlApi", {

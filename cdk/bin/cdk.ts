@@ -76,6 +76,7 @@ const appSyncStack = new AppSyncStack(app, `EkTranscriptAppSync-${environment}`,
   userPool: authStack.userPool,
   interviewsTable: storageStack.interviewsTable,
   inputBucket: storageStack.inputBucket,
+  outputBucket: storageStack.outputBucket,
   description: "AppSync GraphQL and Events API for ek-transcript",
 });
 appSyncStack.addDependency(authStack);

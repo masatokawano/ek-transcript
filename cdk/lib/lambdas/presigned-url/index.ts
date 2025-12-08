@@ -123,6 +123,10 @@ interface VideoUrlResponse {
   expiresIn: number;
 }
 
+// Allowed prefixes for content access
+const ALLOWED_INPUT_PREFIXES = ["uploads/"];
+const ALLOWED_OUTPUT_PREFIXES = ["analysis/", "transcripts/"];
+
 export async function getVideoUrlHandler(event: GetVideoUrlEvent): Promise<VideoUrlResponse> {
   const { arguments: args, identity } = event;
 
@@ -138,14 +142,26 @@ export async function getVideoUrlHandler(event: GetVideoUrlEvent): Promise<Video
 
   const { key } = args;
 
-  // Security: Only allow keys in uploads directory
-  if (!key.startsWith("uploads/")) {
+  // Determine which bucket to use based on key prefix
+  const isInputContent = ALLOWED_INPUT_PREFIXES.some(prefix => key.startsWith(prefix));
+  const isOutputContent = ALLOWED_OUTPUT_PREFIXES.some(prefix => key.startsWith(prefix));
+
+  if (!isInputContent && !isOutputContent) {
     throw new Error("Invalid key: Access denied");
   }
 
-  const bucketName = process.env.BUCKET_NAME;
-  if (!bucketName) {
-    throw new Error("BUCKET_NAME environment variable is not set");
+  // Use appropriate bucket
+  let bucketName: string | undefined;
+  if (isOutputContent) {
+    bucketName = process.env.OUTPUT_BUCKET_NAME;
+    if (!bucketName) {
+      throw new Error("OUTPUT_BUCKET_NAME environment variable is not set");
+    }
+  } else {
+    bucketName = process.env.BUCKET_NAME;
+    if (!bucketName) {
+      throw new Error("BUCKET_NAME environment variable is not set");
+    }
   }
 
   // Create presigned GET URL

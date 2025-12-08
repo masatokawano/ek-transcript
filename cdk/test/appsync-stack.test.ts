@@ -14,6 +14,7 @@ describe("AppSyncStack", () => {
   let mockUserPool: cognito.IUserPool;
   let mockInterviewsTable: dynamodb.ITable;
   let mockInputBucket: s3.IBucket;
+  let mockOutputBucket: s3.IBucket;
 
   beforeEach(() => {
     app = new cdk.App();
@@ -36,11 +37,16 @@ describe("AppSyncStack", () => {
       bucketName: "test-input-bucket",
     });
 
+    mockOutputBucket = new s3.Bucket(prereqStack, "MockOutputBucket", {
+      bucketName: "test-output-bucket",
+    });
+
     stack = new AppSyncStack(app, "TestAppSyncStack", {
       environment: "test",
       userPool: mockUserPool,
       interviewsTable: mockInterviewsTable,
       inputBucket: mockInputBucket,
+      outputBucket: mockOutputBucket,
       env: { account: "123456789012", region: "ap-northeast-1" },
     });
 
