@@ -208,15 +208,48 @@ interface DashboardStats {
   scoreDistribution: number[];
   priorityTargetCount: number; // 25点以上
   promisingTargetCount: number; // 18-24点
+  reviewTargetCount: number; // 12-17点
+  outsideTargetCount: number; // 11点以下
+  // 3スコア別平均
+  avgElectricityScore: number;
+  avgEngagementScore: number;
+  avgCrowdfundingScore: number;
+  // Good Signal集計
+  goodSignals: {
+    pastActions: number; // 電気代削減に過去お金/時間を使った
+    weeklyAppUsers: number; // アプリ週1回以上
+    crowdfundingExp: number; // クラファン経験あり
+    immediateRebuy: number; // 即買い直す意向
+  };
+  // Bad Signal集計
+  badSignals: {
+    noActions: number; // 過去に行動なし
+    noBillCheck: number; // 明細6ヶ月以上見ていない
+    rarelyUseDevice: number; // デバイスほとんど使っていない
+  };
 }
 
 function calculateStats(interviews: InterviewWithAnalysis[]): DashboardStats {
   const completed = interviews.filter(i => i.status === "completed");
   const withScores = completed.filter(i => i.total_score !== null && i.total_score !== undefined);
+  const withAnalysis = completed.filter(i => i.analysisData);
 
   const avgScore = withScores.length > 0
     ? withScores.reduce((sum, i) => sum + (i.total_score || 0), 0) / withScores.length
     : 0;
+
+  // 3スコア別平均
+  let totalElectricityScore = 0, totalEngagementScore = 0, totalCrowdfundingScore = 0;
+  let scoreCount = 0;
+  withAnalysis.forEach(i => {
+    const scoring = i.analysisData?.scoring;
+    if (scoring) {
+      totalElectricityScore += scoring.electricity_interest_score || 0;
+      totalEngagementScore += scoring.engagement_score || 0;
+      totalCrowdfundingScore += scoring.crowdfunding_fit_score || 0;
+      scoreCount++;
+    }
+  });
 
   // セグメント分類 (A: 省エネ意識高, B: ガジェット好き, C: 便利さ追求, D: ライト層)
   const segmentCounts = { A: 0, B: 0, C: 0, D: 0, other: 0 };
@@ -233,15 +266,50 @@ function calculateStats(interviews: InterviewWithAnalysis[]): DashboardStats {
   const scoreDistribution = [0, 0, 0, 0, 0, 0];
   let priorityTargetCount = 0; // 25-30点: 最優先ターゲット
   let promisingTargetCount = 0; // 18-24点: 有望ターゲット
+  let reviewTargetCount = 0; // 12-17点: 要検討
+  let outsideTargetCount = 0; // 11点以下: ターゲット外
 
   withScores.forEach(i => {
     const score = i.total_score || 0;
     const bucket = Math.min(Math.floor(score / 5), 5);
-    scoreDistribution[bucket]++;
+    if (scoreDistribution[bucket] !== undefined) {
+      scoreDistribution[bucket]++;
+    }
 
     // 判定基準によるカウント
     if (score >= 25) priorityTargetCount++;
     else if (score >= 18) promisingTargetCount++;
+    else if (score >= 12) reviewTargetCount++;
+    else outsideTargetCount++;
+  });
+
+  // Good Signal / Bad Signal 集計
+  const goodSignals = { pastActions: 0, weeklyAppUsers: 0, crowdfundingExp: 0, immediateRebuy: 0 };
+  const badSignals = { noActions: 0, noBillCheck: 0, rarelyUseDevice: 0 };
+
+  withAnalysis.forEach(i => {
+    const analysis = i.analysisData;
+    if (!analysis) return;
+
+    // Good Signals
+    const pastActions = analysis.electricity_cost?.past_year_actions;
+    if (pastActions && pastActions.length > 0) goodSignals.pastActions++;
+
+    const appFreq = analysis.device_info?.app_usage_frequency;
+    if (appFreq === "毎日開く" || appFreq?.includes("週")) goodSignals.weeklyAppUsers++;
+
+    if (analysis.crowdfunding_experience?.has_crowdfunding_experience) goodSignals.crowdfundingExp++;
+
+    const rebuyIntent = analysis.device_info?.replacement_intention;
+    if (rebuyIntent?.includes("即") || rebuyIntent?.includes("すぐ")) goodSignals.immediateRebuy++;
+
+    // Bad Signals
+    if (!pastActions || pastActions.length === 0) badSignals.noActions++;
+
+    const billFreq = analysis.electricity_cost?.bill_check_frequency;
+    if (billFreq === "ほぼ見ない" || billFreq?.includes("見ない")) badSignals.noBillCheck++;
+
+    if (appFreq === "ほぼ開かない" || appFreq?.includes("月数回")) badSignals.rarelyUseDevice++;
   });
 
   return {
@@ -252,15 +320,175 @@ function calculateStats(interviews: InterviewWithAnalysis[]): DashboardStats {
     scoreDistribution,
     priorityTargetCount,
     promisingTargetCount,
+    reviewTargetCount,
+    outsideTargetCount,
+    avgElectricityScore: scoreCount > 0 ? Math.round((totalElectricityScore / scoreCount) * 10) / 10 : 0,
+    avgEngagementScore: scoreCount > 0 ? Math.round((totalEngagementScore / scoreCount) * 10) / 10 : 0,
+    avgCrowdfundingScore: scoreCount > 0 ? Math.round((totalCrowdfundingScore / scoreCount) * 10) / 10 : 0,
+    goodSignals,
+    badSignals,
   };
 }
 
 // 判定基準に基づくラベル取得
 function getScoreJudgment(score: number): { label: string; className: string } {
-  if (score >= 25) return { label: "最優先ターゲット", className: styles.judgmentPriority };
-  if (score >= 18) return { label: "有望ターゲット", className: styles.judgmentPromising };
-  if (score >= 12) return { label: "要検討", className: styles.judgmentReview };
-  return { label: "ターゲット外", className: styles.judgmentOutside };
+  if (score >= 25) return { label: "最優先ターゲット", className: styles.judgmentPriority ?? "" };
+  if (score >= 18) return { label: "有望ターゲット", className: styles.judgmentPromising ?? "" };
+  if (score >= 12) return { label: "要検討", className: styles.judgmentReview ?? "" };
+  return { label: "ターゲット外", className: styles.judgmentOutside ?? "" };
+}
+
+// Campfire 500名目標に対するKPIサマリー
+function KPISummary({ stats }: { stats: DashboardStats }) {
+  const TARGET_SUPPORTERS = 500;
+  const priorityRate = stats.completedInterviews > 0
+    ? (stats.priorityTargetCount / stats.completedInterviews) * 100 : 0;
+  const promisingRate = stats.completedInterviews > 0
+    ? (stats.promisingTargetCount / stats.completedInterviews) * 100 : 0;
+
+  return (
+    <div className={styles.kpiSummary}>
+      <h2 className={styles.sectionTitle}>Campfire 500名目標</h2>
+      <div className={styles.kpiGrid}>
+        <div className={styles.kpiCard}>
+          <p className={styles.kpiLabel}>目標進捗</p>
+          <p className={styles.kpiValue}>
+            {stats.completedInterviews}
+            <span className={styles.kpiUnit}>/ {TARGET_SUPPORTERS}</span>
+          </p>
+          <div className={styles.progressBar}>
+            <div
+              className={styles.progressFill}
+              style={{ width: `${Math.min((stats.completedInterviews / TARGET_SUPPORTERS) * 100, 100)}%` }}
+            />
+          </div>
+          <p className={styles.kpiSubLabel}>
+            {Math.round((stats.completedInterviews / TARGET_SUPPORTERS) * 100)}% 達成
+          </p>
+        </div>
+        <div className={styles.kpiCard}>
+          <p className={styles.kpiLabel}>最優先ターゲット率</p>
+          <p className={styles.kpiValue}>
+            {Math.round(priorityRate)}
+            <span className={styles.kpiUnit}>%</span>
+          </p>
+          <p className={styles.kpiSubLabel}>目標: 20%以上</p>
+        </div>
+        <div className={styles.kpiCard}>
+          <p className={styles.kpiLabel}>有望ターゲット率</p>
+          <p className={styles.kpiValue}>
+            {Math.round(promisingRate)}
+            <span className={styles.kpiUnit}>%</span>
+          </p>
+          <p className={styles.kpiSubLabel}>最優先+有望: {Math.round(priorityRate + promisingRate)}%</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// 判定基準別集計
+function JudgmentBreakdown({ stats }: { stats: DashboardStats }) {
+  const total = stats.priorityTargetCount + stats.promisingTargetCount + stats.reviewTargetCount + stats.outsideTargetCount;
+  const items = [
+    { label: "最優先ターゲット", count: stats.priorityTargetCount, range: "25-30点", className: styles.judgmentPriority },
+    { label: "有望ターゲット", count: stats.promisingTargetCount, range: "18-24点", className: styles.judgmentPromising },
+    { label: "要検討", count: stats.reviewTargetCount, range: "12-17点", className: styles.judgmentReview },
+    { label: "ターゲット外", count: stats.outsideTargetCount, range: "0-11点", className: styles.judgmentOutside },
+  ];
+
+  return (
+    <div className={styles.chartCard}>
+      <h3 className={styles.chartTitle}>判定基準別集計</h3>
+      <div className={styles.judgmentGrid}>
+        {items.map((item) => (
+          <div key={item.label} className={styles.judgmentRow}>
+            <span className={`${styles.judgmentBadge} ${item.className}`}>{item.label}</span>
+            <span className={styles.judgmentRange}>{item.range}</span>
+            <span className={styles.judgmentCount}>{item.count}件</span>
+            <span className={styles.judgmentPercent}>
+              {total > 0 ? Math.round((item.count / total) * 100) : 0}%
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// 3スコア詳細分析
+function ScoreAnalysis({ stats }: { stats: DashboardStats }) {
+  const scores = [
+    { label: "電気代関心度", avg: stats.avgElectricityScore, description: "電力切替・料金意識" },
+    { label: "エンゲージメント", avg: stats.avgEngagementScore, description: "デバイス活用度" },
+    { label: "クラファン適合度", avg: stats.avgCrowdfundingScore, description: "支援経験・意欲" },
+  ];
+
+  return (
+    <div className={styles.chartCard}>
+      <h3 className={styles.chartTitle}>3スコア詳細分析</h3>
+      <div className={styles.scoreAnalysisGrid}>
+        {scores.map((score) => (
+          <div key={score.label} className={styles.scoreAnalysisItem}>
+            <p className={styles.scoreAnalysisLabel}>{score.label}</p>
+            <p className={styles.scoreAnalysisValue}>
+              {score.avg}
+              <span className={styles.scoreAnalysisMax}>/10</span>
+            </p>
+            <div className={styles.scoreAnalysisBar}>
+              <div
+                className={styles.scoreAnalysisBarFill}
+                style={{ width: `${score.avg * 10}%` }}
+              />
+            </div>
+            <p className={styles.scoreAnalysisDesc}>{score.description}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Good/Bad Signal集計
+function SignalsGrid({ stats }: { stats: DashboardStats }) {
+  const goodSignals = [
+    { label: "電気代削減に行動", count: stats.goodSignals.pastActions },
+    { label: "アプリ週1回以上", count: stats.goodSignals.weeklyAppUsers },
+    { label: "クラファン経験あり", count: stats.goodSignals.crowdfundingExp },
+    { label: "即買い直す意向", count: stats.goodSignals.immediateRebuy },
+  ];
+  const badSignals = [
+    { label: "過去に行動なし", count: stats.badSignals.noActions },
+    { label: "明細6ヶ月以上未確認", count: stats.badSignals.noBillCheck },
+    { label: "デバイス未活用", count: stats.badSignals.rarelyUseDevice },
+  ];
+
+  return (
+    <div className={styles.signalsSection}>
+      <div className={styles.signalCard}>
+        <h3 className={styles.signalTitle}>Good Signals</h3>
+        <div className={styles.signalList}>
+          {goodSignals.map((signal) => (
+            <div key={signal.label} className={styles.signalItem}>
+              <span className={styles.signalLabel}>{signal.label}</span>
+              <span className={styles.signalCount}>{signal.count}件</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className={styles.signalCard}>
+        <h3 className={styles.signalTitleBad}>Bad Signals</h3>
+        <div className={styles.signalList}>
+          {badSignals.map((signal) => (
+            <div key={signal.label} className={styles.signalItemBad}>
+              <span className={styles.signalLabel}>{signal.label}</span>
+              <span className={styles.signalCount}>{signal.count}件</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function StatsGrid({ stats }: { stats: DashboardStats }) {
@@ -483,8 +711,9 @@ function Dashboard() {
         );
 
         setInterviews(interviewsWithAnalysis);
-        if (interviewsWithAnalysis.length > 0) {
-          setSelectedId(interviewsWithAnalysis[0].interview_id);
+        const firstInterview = interviewsWithAnalysis[0];
+        if (firstInterview) {
+          setSelectedId(firstInterview.interview_id);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load interviews");
@@ -541,10 +770,24 @@ function Dashboard() {
               </span>
               <div className={styles.interviewItemMeta}>
                 {interview.total_score !== null && interview.total_score !== undefined && (
-                  <span className={styles.interviewItemScore}>{interview.total_score}点</span>
+                  <>
+                    <span className={styles.interviewItemScore}>{interview.total_score}点</span>
+                    <span className={`${styles.judgmentMini} ${getScoreJudgment(interview.total_score).className}`}>
+                      {getScoreJudgment(interview.total_score).label}
+                    </span>
+                  </>
                 )}
                 <SegmentBadge segment={interview.analysisData?.scoring?.segment} />
               </div>
+              {interview.status === "completed" && (
+                <Link
+                  href={`/interview/${interview.interview_id}`}
+                  className={styles.interviewItemLink}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  詳細を見る →
+                </Link>
+              )}
             </div>
           ))}
         </div>
@@ -552,7 +795,13 @@ function Dashboard() {
 
       {/* Right main area */}
       <div className={styles.mainArea}>
+        <KPISummary stats={stats} />
         <StatsGrid stats={stats} />
+        <div className={styles.analysisRow}>
+          <JudgmentBreakdown stats={stats} />
+          <ScoreAnalysis stats={stats} />
+        </div>
+        <SignalsGrid stats={stats} />
         <ChartsSection stats={stats} />
         {selectedInterview && <InterviewDetailPanel interview={selectedInterview} />}
       </div>
