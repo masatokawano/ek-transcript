@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "../../../lib/auth-context";
@@ -8,6 +8,20 @@ import { getInterview, getVideoUrl, type Interview } from "../../../lib/graphql"
 import styles from "./page.module.css";
 
 type ProcessingStatus = "pending" | "processing" | "completed" | "failed";
+
+const STEP_LABELS: Record<string, string> = {
+  queued: "キューに追加されました",
+  extracting_audio: "音声を抽出中...",
+  chunking_audio: "音声を分割中...",
+  diarizing: "話者分離中...",
+  merging_speakers: "話者情報を統合中...",
+  splitting_by_speaker: "話者ごとに分割中...",
+  transcribing: "文字起こし中...",
+  aggregating_results: "結果を集約中...",
+  analyzing: "LLM分析中...",
+  completed: "処理完了",
+  failed: "処理失敗",
+};
 
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
@@ -20,7 +34,7 @@ function formatDate(dateString: string): string {
   });
 }
 
-function StatusBadge({ status }: { status: ProcessingStatus }) {
+function StatusBadge({ status, progress }: { status: ProcessingStatus; progress?: number | null }) {
   const statusConfig = {
     pending: { label: "待機中", className: styles.statusPending },
     processing: { label: "処理中", className: styles.statusProcessing },
@@ -29,7 +43,14 @@ function StatusBadge({ status }: { status: ProcessingStatus }) {
   };
 
   const config = statusConfig[status];
-  return <span className={`${styles.statusBadge} ${config.className}`}>{config.label}</span>;
+  const showProgress = status === "processing" && progress !== null && progress !== undefined;
+
+  return (
+    <span className={`${styles.statusBadge} ${config.className}`}>
+      {config.label}
+      {showProgress && ` ${progress}%`}
+    </span>
+  );
 }
 
 function VideoPlayer({ videoKey }: { videoKey: string }) {
@@ -121,7 +142,7 @@ function InterviewContent({ interview }: { interview: Interview }) {
           {interview.status && (
             <div className={styles.metaItem}>
               <span className={styles.metaLabel}>ステータス</span>
-              <StatusBadge status={interview.status as ProcessingStatus} />
+              <StatusBadge status={interview.status as ProcessingStatus} progress={interview.progress} />
             </div>
           )}
           {interview.file_name && (
@@ -183,50 +204,47 @@ function InterviewContent({ interview }: { interview: Interview }) {
   );
 }
 
-function ProcessingView({ interviewId }: { interviewId: string }) {
-  const [status, setStatus] = useState<ProcessingStatus>("processing");
-  const [progress, setProgress] = useState(0);
-  const [currentStep, setCurrentStep] = useState("処理を開始しています...");
-
-  const steps = [
-    "音声抽出中...",
-    "音声分割中...",
-    "話者分離中...",
-    "文字起こし中...",
-    "結果集約中...",
-    "LLM分析中...",
-  ];
-
-  useEffect(() => {
-    // TODO: AppSync Events API subscription を実装
-    // 現在はシミュレーション
-    let stepIndex = 0;
-    const interval = setInterval(() => {
-      if (stepIndex < steps.length) {
-        setCurrentStep(steps[stepIndex]);
-        setProgress(Math.min(((stepIndex + 1) / steps.length) * 100, 95));
-        stepIndex++;
-      }
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, []);
+function ProcessingView({ interview }: { interview: Interview }) {
+  const progress = interview.progress ?? 0;
+  const currentStep = interview.current_step
+    ? STEP_LABELS[interview.current_step] || interview.current_step
+    : "処理を開始しています...";
 
   return (
     <div className={styles.processingContainer}>
-      <div className={styles.processingIcon}>...</div>
+      <div className={styles.processingIcon}>⏳</div>
       <h2 className={styles.processingTitle}>処理中</h2>
-      <p className={styles.processingStep}>{currentStep}</p>
+      <p className={styles.currentStepText}>{currentStep}</p>
       <div className={styles.progressBar}>
         <div
           className={styles.progressFill}
           style={{ width: `${progress}%` }}
         />
       </div>
-      <p className={styles.progressText}>{Math.round(progress)}%</p>
+      <p className={styles.progressText}>{progress}%</p>
       <p className={styles.processingNote}>
-        処理には数分かかる場合があります。このページを開いたままお待ちください。
+        処理には数分かかる場合があります。このページは自動的に更新されます。
       </p>
+    </div>
+  );
+}
+
+function FailedView({ interview, onRetry }: { interview: Interview; onRetry: () => void }) {
+  const failedStep = interview.current_step
+    ? STEP_LABELS[interview.current_step] || interview.current_step
+    : "不明なステップ";
+
+  return (
+    <div className={styles.failedContainer}>
+      <div className={styles.failedIcon}>❌</div>
+      <h2 className={styles.failedTitle}>処理に失敗しました</h2>
+      <p className={styles.currentStepText}>失敗したステップ: {failedStep}</p>
+      {interview.error_message && (
+        <p className={styles.failedMessage}>{interview.error_message}</p>
+      )}
+      <button className={styles.retryButton} onClick={onRetry}>
+        ダッシュボードに戻る
+      </button>
     </div>
   );
 }
@@ -241,6 +259,19 @@ export default function InterviewPage() {
 
   const interviewId = params.id as string;
 
+  const loadInterview = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await getInterview(interviewId);
+      setInterview(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load interview");
+    } finally {
+      setLoading(false);
+    }
+  }, [interviewId]);
+
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.push("/dashboard");
@@ -250,18 +281,21 @@ export default function InterviewPage() {
     if (!authLoading && isAuthenticated && interviewId) {
       loadInterview();
     }
-  }, [authLoading, isAuthenticated, interviewId]);
+  }, [authLoading, isAuthenticated, interviewId, loadInterview, router]);
 
-  const loadInterview = async () => {
-    try {
-      setLoading(true);
-      const data = await getInterview(interviewId);
-      setInterview(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load interview");
-    } finally {
-      setLoading(false);
+  // 処理中の場合は5秒ごとにポーリング
+  useEffect(() => {
+    const status = interview?.status;
+    if (status === "pending" || status === "processing") {
+      const interval = setInterval(() => {
+        loadInterview();
+      }, 5000);
+      return () => clearInterval(interval);
     }
+  }, [interview?.status, loadInterview]);
+
+  const handleBackToDashboard = () => {
+    router.push("/dashboard");
   };
 
   if (authLoading || loading) {
@@ -273,6 +307,8 @@ export default function InterviewPage() {
       </div>
     );
   }
+
+  const status = (interview?.status as ProcessingStatus) || "pending";
 
   return (
     <div className={styles.page}>
@@ -297,11 +333,17 @@ export default function InterviewPage() {
         </div>
       )}
 
-      {!interview && !error && (
-        <ProcessingView interviewId={interviewId} />
+      {!error && interview && status === "failed" && (
+        <FailedView interview={interview} onRetry={handleBackToDashboard} />
       )}
 
-      {interview && <InterviewContent interview={interview} />}
+      {!error && interview && (status === "pending" || status === "processing") && (
+        <ProcessingView interview={interview} />
+      )}
+
+      {!error && interview && status === "completed" && (
+        <InterviewContent interview={interview} />
+      )}
     </div>
   );
 }

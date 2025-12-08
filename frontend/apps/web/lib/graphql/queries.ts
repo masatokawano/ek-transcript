@@ -5,6 +5,9 @@ export const GET_INTERVIEW = /* GraphQL */ `
       segment
       created_at
       status
+      progress
+      current_step
+      error_message
       analysis_key
       transcript_key
       video_key
@@ -27,6 +30,9 @@ export const LIST_INTERVIEWS = /* GraphQL */ `
         segment
         created_at
         status
+        progress
+        current_step
+        error_message
         analysis_key
         transcript_key
         video_key

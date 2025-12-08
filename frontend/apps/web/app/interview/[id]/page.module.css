@@ -261,6 +261,44 @@
   margin: 0;
 }
 
+.failedContainer {
+  max-width: 500px;
+  margin: 0 auto;
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.failedIcon {
+  font-size: 48px;
+  margin-bottom: 24px;
+}
+
+.failedTitle {
+  font-family: var(--font-geist-sans);
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0 0 16px 0;
+  color: var(--error);
+}
+
+.failedMessage {
+  font-family: var(--font-geist-mono);
+  font-size: 14px;
+  padding: 16px;
+  border-radius: 8px;
+  background: rgba(var(--error-rgb), 0.1);
+  color: var(--error);
+  margin: 0 0 24px 0;
+  word-break: break-word;
+}
+
+.currentStepText {
+  font-family: var(--font-geist-sans);
+  font-size: 14px;
+  opacity: 0.7;
+  margin: 0 0 8px 0;
+}
+
 .videoSection {
   margin-bottom: 32px;
 }

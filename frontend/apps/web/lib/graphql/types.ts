@@ -3,6 +3,9 @@ export interface Interview {
   segment: string;
   created_at: string;
   status?: string | null;
+  progress?: number | null;
+  current_step?: string | null;
+  error_message?: string | null;
   analysis_key?: string | null;
   transcript_key?: string | null;
   video_key?: string | null;

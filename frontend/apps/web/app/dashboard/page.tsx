@@ -142,6 +142,27 @@ function AuthForm() {
   );
 }
 
+type ProcessingStatus = "pending" | "processing" | "completed" | "failed";
+
+function StatusBadge({ status, progress }: { status: ProcessingStatus; progress?: number | null }) {
+  const statusConfig = {
+    pending: { label: "待機中", className: styles.statusPending },
+    processing: { label: "処理中", className: styles.statusProcessing },
+    completed: { label: "完了", className: styles.statusCompleted },
+    failed: { label: "失敗", className: styles.statusFailed },
+  };
+
+  const config = statusConfig[status];
+  const showProgress = status === "processing" && progress !== null && progress !== undefined;
+
+  return (
+    <span className={`${styles.statusBadge} ${config.className}`}>
+      {config.label}
+      {showProgress && <span className={styles.progressText}>{progress}%</span>}
+    </span>
+  );
+}
+
 function InterviewList() {
   const [interviews, setInterviews] = useState<Interview[]>([]);
   const [loading, setLoading] = useState(true);
@@ -187,16 +208,22 @@ function InterviewList() {
         >
           <div className={styles.cardHeader}>
             <h3 className={styles.cardTitle}>
-              Interview {interview.interview_id.substring(0, 8)}
+              {interview.file_name || `Interview ${interview.interview_id.substring(0, 8)}`}
             </h3>
-            <span className={styles.segment}>{interview.segment}</span>
+            <StatusBadge
+              status={(interview.status as ProcessingStatus) || "pending"}
+              progress={interview.progress}
+            />
           </div>
           <div className={styles.cardMeta}>
             {new Date(interview.created_at).toLocaleString("ja-JP")}
           </div>
-          {interview.total_score !== null && (
-            <span className={styles.score}>Score: {interview.total_score}</span>
-          )}
+          <div className={styles.cardInfo}>
+            {interview.segment && <span className={styles.segment}>{interview.segment}</span>}
+            {interview.total_score !== null && interview.total_score !== undefined && (
+              <span className={styles.score}>Score: {interview.total_score}</span>
+            )}
+          </div>
         </Link>
       ))}
     </div>
