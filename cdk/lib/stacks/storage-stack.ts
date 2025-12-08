@@ -67,6 +67,14 @@ export class StorageStack extends cdk.Stack {
           ? cdk.RemovalPolicy.RETAIN
           : cdk.RemovalPolicy.DESTROY,
       autoDeleteObjects: environment !== "prod",
+      cors: [
+        {
+          allowedMethods: [s3.HttpMethods.GET, s3.HttpMethods.HEAD],
+          allowedOrigins: ["*"],
+          allowedHeaders: ["*"],
+          exposedHeaders: ["ETag"],
+        },
+      ],
       lifecycleRules: [
         {
           id: "DeleteOldResults",
