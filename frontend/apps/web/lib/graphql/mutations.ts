@@ -108,3 +108,24 @@ export const SYNC_CALENDAR = /* GraphQL */ `
     }
   }
 `;
+
+// Google OAuth mutations
+export const CONNECT_GOOGLE = /* GraphQL */ `
+  mutation ConnectGoogle($input: ConnectGoogleInput!) {
+    connectGoogle(input: $input) {
+      success
+      email
+      error_message
+    }
+  }
+`;
+
+export const DISCONNECT_GOOGLE = /* GraphQL */ `
+  mutation DisconnectGoogle {
+    disconnectGoogle {
+      success
+      email
+      error_message
+    }
+  }
+`;

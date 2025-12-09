@@ -1,4 +1,5 @@
 # Shared Lambda Layer dependencies
+# Build: 2025-12-09-v2 (force layer update)
 boto3>=1.42.0
 google-auth>=2.37.0
 google-auth-oauthlib>=1.2.0

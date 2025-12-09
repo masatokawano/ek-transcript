@@ -33,6 +33,32 @@ import { UPDATE_INTERVIEW, DELETE_INTERVIEW, CREATE_MEETING, UPDATE_MEETING, DEL
 
 const client = generateClient();
 
+// Generic graphql client for direct query/mutation calls
+export const graphqlClient = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async query<T>(query: string, variables?: any): Promise<T> {
+    const response = await client.graphql({
+      query,
+      variables,
+    }) as GraphQLResult<T>;
+    if (!response.data) {
+      throw new Error("GraphQL query failed");
+    }
+    return response.data;
+  },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async mutate<T>(query: string, variables?: any): Promise<T> {
+    const response = await client.graphql({
+      query,
+      variables,
+    }) as GraphQLResult<T>;
+    if (!response.data) {
+      throw new Error("GraphQL mutation failed");
+    }
+    return response.data;
+  },
+};
+
 export async function getInterview(
   interviewId: string
 ): Promise<Interview | null> {

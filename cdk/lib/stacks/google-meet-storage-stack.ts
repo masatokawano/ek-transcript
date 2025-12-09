@@ -1,6 +1,7 @@
 import * as cdk from "aws-cdk-lib";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as kms from "aws-cdk-lib/aws-kms";
+import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import { Construct } from "constructs";
 
 export interface GoogleMeetStorageStackProps extends cdk.StackProps {
@@ -21,6 +22,7 @@ export class GoogleMeetStorageStack extends cdk.Stack {
   public readonly googleTokensTable: dynamodb.Table;
   public readonly subscriptionsTable: dynamodb.Table;
   public readonly tokenEncryptionKey: kms.Key;
+  public readonly googleOAuthSecret: secretsmanager.Secret;
 
   constructor(scope: Construct, id: string, props: GoogleMeetStorageStackProps) {
     super(scope, id, props);
@@ -38,6 +40,14 @@ export class GoogleMeetStorageStack extends cdk.Stack {
         environment === "prod"
           ? cdk.RemovalPolicy.RETAIN
           : cdk.RemovalPolicy.DESTROY,
+    });
+
+    // ========================================
+    // Google OAuth Secret
+    // ========================================
+    this.googleOAuthSecret = new secretsmanager.Secret(this, "GoogleOAuthSecret", {
+      secretName: `ek-transcript/${environment}/google-oauth`,
+      description: "Google OAuth Client ID and Secret for Google Meet integration",
     });
 
     // ========================================
@@ -164,6 +174,11 @@ export class GoogleMeetStorageStack extends cdk.Stack {
     new cdk.CfnOutput(this, "TokenEncryptionKeyArn", {
       value: this.tokenEncryptionKey.keyArn,
       exportName: `${id}-TokenEncryptionKeyArn`,
+    });
+
+    new cdk.CfnOutput(this, "GoogleOAuthSecretArn", {
+      value: this.googleOAuthSecret.secretArn,
+      exportName: `${id}-GoogleOAuthSecretArn`,
     });
   }
 }

@@ -293,3 +293,45 @@ export interface DeleteMeetingResponse {
 export interface SyncCalendarResponse {
   syncCalendar: CalendarSyncResult;
 }
+
+// Google OAuth types
+export interface GoogleAuthUrlResponse {
+  auth_url: string;
+  state: string;
+}
+
+export interface GoogleConnectionStatus {
+  connected: boolean;
+  email?: string | null;
+  scopes?: string[] | null;
+  expires_at?: string | null;
+  is_expired?: boolean | null;
+}
+
+export interface GoogleConnectionResult {
+  success: boolean;
+  email?: string | null;
+  error_message?: string | null;
+}
+
+export interface ConnectGoogleInput {
+  code: string;
+  redirect_uri: string;
+  state: string;
+}
+
+export interface GetGoogleAuthUrlResponse {
+  getGoogleAuthUrl: GoogleAuthUrlResponse;
+}
+
+export interface GetGoogleConnectionStatusResponse {
+  getGoogleConnectionStatus: GoogleConnectionStatus;
+}
+
+export interface ConnectGoogleResponse {
+  connectGoogle: GoogleConnectionResult;
+}
+
+export interface DisconnectGoogleResponse {
+  disconnectGoogle: GoogleConnectionResult;
+}

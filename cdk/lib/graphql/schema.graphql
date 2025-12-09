@@ -91,6 +91,18 @@ type Query {
     nextToken: String
   ): MeetingConnection
     @aws_cognito_user_pools
+
+  # ========================================
+  # Google OAuth Queries
+  # ========================================
+
+  # Google OAuth 認証 URL 取得
+  getGoogleAuthUrl(redirect_uri: String!): GoogleAuthUrlResponse
+    @aws_cognito_user_pools
+
+  # Google 接続状態確認
+  getGoogleConnectionStatus: GoogleConnectionStatus
+    @aws_cognito_user_pools
 }
 
 type Mutation {
@@ -132,6 +144,18 @@ type Mutation {
     auto_recording: Boolean!
     auto_transcription: Boolean
   ): Meeting
+    @aws_cognito_user_pools
+
+  # ========================================
+  # Google OAuth Mutations
+  # ========================================
+
+  # Google アカウント接続（認証コードをトークンに交換）
+  connectGoogle(input: ConnectGoogleInput!): GoogleConnectionResult
+    @aws_cognito_user_pools
+
+  # Google アカウント接続解除
+  disconnectGoogle: GoogleConnectionResult
     @aws_cognito_user_pools
 }
 
@@ -260,6 +284,35 @@ input SyncCalendarInput {
   start_date: AWSDateTime
   end_date: AWSDateTime
   max_results: Int
+}
+
+# ========================================
+# Google OAuth Types
+# ========================================
+
+type GoogleAuthUrlResponse @aws_cognito_user_pools {
+  auth_url: String!
+  state: String!
+}
+
+type GoogleConnectionStatus @aws_cognito_user_pools {
+  connected: Boolean!
+  email: String
+  scopes: [String!]
+  expires_at: AWSDateTime
+  is_expired: Boolean
+}
+
+type GoogleConnectionResult @aws_cognito_user_pools {
+  success: Boolean!
+  email: String
+  error_message: String
+}
+
+input ConnectGoogleInput {
+  code: String!
+  redirect_uri: String!
+  state: String!
 }
 
 schema {

@@ -16,6 +16,7 @@ export interface AppSyncStackProps extends cdk.StackProps {
   outputBucket: s3.IBucket;
   meetingsTable?: dynamodb.ITable;
   calendarSyncLambda?: lambda.IFunction;
+  googleAuthLambda?: lambda.IFunction;
 }
 
 export class AppSyncStack extends cdk.Stack {
@@ -25,7 +26,7 @@ export class AppSyncStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: AppSyncStackProps) {
     super(scope, id, props);
 
-    const { environment, userPool, interviewsTable, inputBucket, outputBucket, meetingsTable, calendarSyncLambda } = props;
+    const { environment, userPool, interviewsTable, inputBucket, outputBucket, meetingsTable, calendarSyncLambda, googleAuthLambda } = props;
 
     // Presigned URL Lambda (Upload)
     const presignedUrlLambda = new lambdaNodejs.NodejsFunction(
@@ -280,12 +281,62 @@ export class AppSyncStack extends cdk.Stack {
         calendarSyncLambda
       );
 
-      // syncCalendar resolver (Lambda proxy - no custom resolver code needed)
+      // syncCalendar resolver
       new appsync.Resolver(this, "SyncCalendarResolver", {
         api: this.graphqlApi,
         typeName: "Mutation",
         fieldName: "syncCalendar",
         dataSource: calendarSyncDataSource,
+        runtime: appsync.FunctionRuntime.JS_1_0_0,
+        code: appsync.Code.fromAsset(path.join(resolversPath, "syncCalendar.js")),
+      });
+    }
+
+    // Google Auth Lambda resolvers
+    if (googleAuthLambda) {
+      const googleAuthDataSource = this.graphqlApi.addLambdaDataSource(
+        "GoogleAuthDataSource",
+        googleAuthLambda
+      );
+
+      // getGoogleAuthUrl resolver
+      new appsync.Resolver(this, "GetGoogleAuthUrlResolver", {
+        api: this.graphqlApi,
+        typeName: "Query",
+        fieldName: "getGoogleAuthUrl",
+        dataSource: googleAuthDataSource,
+        runtime: appsync.FunctionRuntime.JS_1_0_0,
+        code: appsync.Code.fromAsset(path.join(resolversPath, "getGoogleAuthUrl.js")),
+      });
+
+      // getGoogleConnectionStatus resolver
+      new appsync.Resolver(this, "GetGoogleConnectionStatusResolver", {
+        api: this.graphqlApi,
+        typeName: "Query",
+        fieldName: "getGoogleConnectionStatus",
+        dataSource: googleAuthDataSource,
+        runtime: appsync.FunctionRuntime.JS_1_0_0,
+        code: appsync.Code.fromAsset(path.join(resolversPath, "getGoogleConnectionStatus.js")),
+      });
+
+      // connectGoogle resolver
+      new appsync.Resolver(this, "ConnectGoogleResolver", {
+        api: this.graphqlApi,
+        typeName: "Mutation",
+        fieldName: "connectGoogle",
+        dataSource: googleAuthDataSource,
+        runtime: appsync.FunctionRuntime.JS_1_0_0,
+        code: appsync.Code.fromAsset(path.join(resolversPath, "connectGoogle.js")),
+      });
+
+      // disconnectGoogle resolver
+      new appsync.Resolver(this, "DisconnectGoogleResolver", {
+        api: this.graphqlApi,
+        typeName: "Mutation",
+        fieldName: "disconnectGoogle",
+        dataSource: googleAuthDataSource,
+        runtime: appsync.FunctionRuntime.JS_1_0_0,
+        code: appsync.Code.fromAsset(path.join(resolversPath, "disconnectGoogle.js")),
       });
     }
 

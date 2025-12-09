@@ -7,6 +7,7 @@ import { StepFunctionsStack } from "../lib/stacks/stepfunctions-stack";
 import { AuthStack } from "../lib/stacks/auth-stack";
 import { AppSyncStack } from "../lib/stacks/appsync-stack";
 import { GoogleMeetStorageStack } from "../lib/stacks/google-meet-storage-stack";
+import { GoogleMeetLambdaStack } from "../lib/stacks/google-meet-lambda-stack";
 
 const app = new cdk.App();
 
@@ -70,19 +71,6 @@ const authStack = new AuthStack(app, `EkTranscriptAuth-${environment}`, {
   description: "Cognito User Pool for ek-transcript authentication",
 });
 
-// AppSync Stack (GraphQL + Events API)
-const appSyncStack = new AppSyncStack(app, `EkTranscriptAppSync-${environment}`, {
-  env,
-  environment,
-  userPool: authStack.userPool,
-  interviewsTable: storageStack.interviewsTable,
-  inputBucket: storageStack.inputBucket,
-  outputBucket: storageStack.outputBucket,
-  description: "AppSync GraphQL and Events API for ek-transcript",
-});
-appSyncStack.addDependency(authStack);
-appSyncStack.addDependency(storageStack);
-
 // Google Meet Storage Stack
 const googleMeetStorageStack = new GoogleMeetStorageStack(
   app,
@@ -93,6 +81,42 @@ const googleMeetStorageStack = new GoogleMeetStorageStack(
     description: "DynamoDB tables and KMS key for Google Meet integration",
   }
 );
+
+// Google Meet Lambda Stack
+const googleMeetLambdaStack = new GoogleMeetLambdaStack(
+  app,
+  `EkTranscriptGoogleMeetLambda-${environment}`,
+  {
+    env,
+    environment,
+    meetingsTable: googleMeetStorageStack.meetingsTable,
+    tokensTable: googleMeetStorageStack.googleTokensTable,
+    subscriptionsTable: googleMeetStorageStack.subscriptionsTable,
+    tokenEncryptionKey: googleMeetStorageStack.tokenEncryptionKey,
+    recordingsBucket: storageStack.inputBucket,
+    googleOAuthSecret: googleMeetStorageStack.googleOAuthSecret,
+    description: "Lambda functions for Google Meet integration",
+  }
+);
+googleMeetLambdaStack.addDependency(googleMeetStorageStack);
+googleMeetLambdaStack.addDependency(storageStack);
+
+// AppSync Stack (GraphQL + Events API)
+const appSyncStack = new AppSyncStack(app, `EkTranscriptAppSync-${environment}`, {
+  env,
+  environment,
+  userPool: authStack.userPool,
+  interviewsTable: storageStack.interviewsTable,
+  inputBucket: storageStack.inputBucket,
+  outputBucket: storageStack.outputBucket,
+  meetingsTable: googleMeetStorageStack.meetingsTable,
+  calendarSyncLambda: googleMeetLambdaStack.calendarSyncLambda,
+  googleAuthLambda: googleMeetLambdaStack.googleAuthLambda,
+  description: "AppSync GraphQL and Events API for ek-transcript",
+});
+appSyncStack.addDependency(authStack);
+appSyncStack.addDependency(storageStack);
+appSyncStack.addDependency(googleMeetLambdaStack);
 
 // Tags
 cdk.Tags.of(app).add("Project", "ek-transcript");

@@ -3,6 +3,7 @@ import { Template, Match } from "aws-cdk-lib/assertions";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as kms from "aws-cdk-lib/aws-kms";
 import * as s3 from "aws-cdk-lib/aws-s3";
+import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import { GoogleMeetLambdaStack } from "../lib/stacks/google-meet-lambda-stack";
 
 describe("GoogleMeetLambdaStack", () => {
@@ -16,6 +17,7 @@ describe("GoogleMeetLambdaStack", () => {
   let subscriptionsTable: dynamodb.Table;
   let tokenEncryptionKey: kms.Key;
   let recordingsBucket: s3.Bucket;
+  let googleOAuthSecret: secretsmanager.Secret;
   let mockStack: cdk.Stack;
 
   beforeAll(() => {
@@ -59,6 +61,10 @@ describe("GoogleMeetLambdaStack", () => {
       bucketName: "mock-recordings-bucket",
     });
 
+    googleOAuthSecret = new secretsmanager.Secret(mockStack, "MockGoogleOAuthSecret", {
+      secretName: "mock-google-oauth-secret",
+    });
+
     stack = new GoogleMeetLambdaStack(app, "TestGoogleMeetLambdaStack", {
       environment: "test",
       meetingsTable,
@@ -66,8 +72,7 @@ describe("GoogleMeetLambdaStack", () => {
       subscriptionsTable,
       tokenEncryptionKey,
       recordingsBucket,
-      googleClientId: "test-client-id",
-      googleClientSecret: "test-client-secret",
+      googleOAuthSecret,
       env: {
         account: "123456789012",
         region: "ap-northeast-1",

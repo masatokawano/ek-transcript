@@ -11,6 +11,7 @@ import {
   type MeetingStatus,
   type CreateMeetingInput,
 } from "../../lib/graphql";
+import { GoogleConnectButton } from "../../components/GoogleConnectButton";
 import styles from "./page.module.css";
 
 type FilterStatus = "ALL" | MeetingStatus;
@@ -377,6 +378,7 @@ function MeetingsContent() {
 export default function MeetingsPage() {
   const { isAuthenticated, isLoading, user, signOut } = useAuth();
   const [syncing, setSyncing] = useState(false);
+  const [googleConnected, setGoogleConnected] = useState(false);
 
   const handleSyncCalendar = async () => {
     setSyncing(true);
@@ -422,7 +424,8 @@ export default function MeetingsPage() {
           <button
             className={styles.syncButton}
             onClick={handleSyncCalendar}
-            disabled={syncing}
+            disabled={syncing || !googleConnected}
+            title={!googleConnected ? "Google アカウントを接続してください" : ""}
           >
             {syncing ? "同期中..." : "カレンダー同期"}
           </button>
@@ -439,6 +442,9 @@ export default function MeetingsPage() {
         </div>
       </header>
       <main>
+        <div style={{ marginBottom: 24 }}>
+          <GoogleConnectButton onConnectionChange={setGoogleConnected} />
+        </div>
         <MeetingsContent />
       </main>
     </div>

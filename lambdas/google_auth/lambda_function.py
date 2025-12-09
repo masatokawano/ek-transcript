@@ -4,13 +4,14 @@ Google OAuth 認証 Lambda
 OAuth 2.0 Authorization Code Flow を処理し、
 トークンを KMS で暗号化して DynamoDB に保存する。
 
-Version: 1.0
+Version: 1.1
 """
 
 import json
 import logging
 import os
 from datetime import datetime, timezone
+from functools import lru_cache
 
 import boto3
 from google.oauth2.credentials import Credentials
@@ -23,15 +24,41 @@ logger.setLevel(logging.INFO)
 # AWS クライアント
 dynamodb = boto3.resource("dynamodb")
 kms = boto3.client("kms")
+secretsmanager = boto3.client("secretsmanager")
 
 # 環境変数
-GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
-GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+GOOGLE_OAUTH_SECRET_ARN = os.environ.get("GOOGLE_OAUTH_SECRET_ARN", "")
 KMS_KEY_ID = os.environ.get("KMS_KEY_ID", "")
 TOKENS_TABLE = os.environ.get("TOKENS_TABLE", "")
 
+
+@lru_cache(maxsize=1)
+def _get_google_oauth_credentials() -> tuple[str, str]:
+    """
+    Secrets Manager から Google OAuth 認証情報を取得（キャッシュ付き）
+
+    Returns:
+        tuple: (client_id, client_secret)
+    """
+    if not GOOGLE_OAUTH_SECRET_ARN:
+        raise ValueError("GOOGLE_OAUTH_SECRET_ARN environment variable is not set")
+
+    logger.info("Fetching Google OAuth credentials from Secrets Manager")
+    response = secretsmanager.get_secret_value(SecretId=GOOGLE_OAUTH_SECRET_ARN)
+    secret = json.loads(response["SecretString"])
+
+    client_id = secret.get("client_id", "")
+    client_secret = secret.get("client_secret", "")
+
+    if not client_id or not client_secret:
+        raise ValueError("Google OAuth credentials not found in secret")
+
+    return client_id, client_secret
+
 # Google OAuth スコープ（最小権限）
+# Note: openid is automatically added by Google, so we include it explicitly
 SCOPES = [
+    "openid",
     "https://www.googleapis.com/auth/calendar.events",
     "https://www.googleapis.com/auth/meetings.space.settings",
     "https://www.googleapis.com/auth/drive.readonly",
@@ -41,10 +68,11 @@ SCOPES = [
 
 def _get_client_config() -> dict:
     """OAuth クライアント設定を取得"""
+    client_id, client_secret = _get_google_oauth_credentials()
     return {
         "web": {
-            "client_id": GOOGLE_CLIENT_ID,
-            "client_secret": GOOGLE_CLIENT_SECRET,
+            "client_id": client_id,
+            "client_secret": client_secret,
             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
             "token_uri": "https://oauth2.googleapis.com/token",
         }
@@ -276,6 +304,36 @@ def lambda_handler(event: dict, context) -> dict:
             revoke_tokens(user_id)
 
             return {"success": True}
+
+        elif action == "check_status":
+            user_id = event["user_id"]
+            tokens = get_tokens(user_id)
+
+            if tokens is None:
+                return {
+                    "connected": False,
+                    "email": None,
+                    "scopes": [],
+                    "expires_at": None,
+                    "is_expired": None,
+                }
+
+            # 期限を確認
+            is_expired = False
+            expires_at_iso = None
+            if tokens.get("expires_at"):
+                from datetime import datetime, timezone
+                expires_at = datetime.fromtimestamp(tokens["expires_at"], tz=timezone.utc)
+                is_expired = expires_at < datetime.now(timezone.utc)
+                expires_at_iso = expires_at.isoformat()
+
+            return {
+                "connected": True,
+                "email": tokens.get("email"),
+                "scopes": tokens.get("scopes", []),
+                "expires_at": expires_at_iso,
+                "is_expired": is_expired,
+            }
 
         else:
             return {"error": f"Unknown action: {action}"}

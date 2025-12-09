@@ -143,3 +143,25 @@ export const LIST_MEETINGS = /* GraphQL */ `
     }
   }
 `;
+
+// Google OAuth queries
+export const GET_GOOGLE_AUTH_URL = /* GraphQL */ `
+  query GetGoogleAuthUrl($redirect_uri: String!) {
+    getGoogleAuthUrl(redirect_uri: $redirect_uri) {
+      auth_url
+      state
+    }
+  }
+`;
+
+export const GET_GOOGLE_CONNECTION_STATUS = /* GraphQL */ `
+  query GetGoogleConnectionStatus {
+    getGoogleConnectionStatus {
+      connected
+      email
+      scopes
+      expires_at
+      is_expired
+    }
+  }
+`;

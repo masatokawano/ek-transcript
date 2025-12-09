@@ -4,6 +4,7 @@ import * as iam from "aws-cdk-lib/aws-iam";
 import * as kms from "aws-cdk-lib/aws-kms";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as s3 from "aws-cdk-lib/aws-s3";
+import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import { Construct } from "constructs";
 import * as path from "path";
 
@@ -14,8 +15,7 @@ export interface GoogleMeetLambdaStackProps extends cdk.StackProps {
   subscriptionsTable: dynamodb.ITable;
   tokenEncryptionKey: kms.IKey;
   recordingsBucket: s3.IBucket;
-  googleClientId: string;
-  googleClientSecret: string;
+  googleOAuthSecret: secretsmanager.ISecret;
 }
 
 /**
@@ -45,8 +45,7 @@ export class GoogleMeetLambdaStack extends cdk.Stack {
       subscriptionsTable,
       tokenEncryptionKey,
       recordingsBucket,
-      googleClientId,
-      googleClientSecret,
+      googleOAuthSecret,
     } = props;
 
     // ========================================
@@ -67,17 +66,19 @@ export class GoogleMeetLambdaStack extends cdk.Stack {
               "cp -r *.py /asset-output/python/ 2>/dev/null || true",
             ].join(" && "),
           ],
-          // Skip Docker bundling in test environment
+          // Local bundling with pip install
           local: {
             tryBundle(outputDir: string): boolean {
-              // In test/local environment, just copy the source files
               const { execSync } = require("child_process");
               try {
                 execSync(`mkdir -p ${outputDir}/python`);
+                // Install pip packages to the output directory
+                execSync(`pip install -r ${sharedLayerPath}/requirements.txt -t ${outputDir}/python --platform manylinux2014_x86_64 --only-binary=:all: --upgrade 2>/dev/null || pip install -r ${sharedLayerPath}/requirements.txt -t ${outputDir}/python --upgrade`, { stdio: "inherit" });
+                // Copy source files
                 execSync(`cp -r ${sharedLayerPath}/*.py ${outputDir}/python/ 2>/dev/null || true`);
-                execSync(`cp ${sharedLayerPath}/requirements.txt ${outputDir}/python/ 2>/dev/null || true`);
                 return true;
-              } catch {
+              } catch (e) {
+                console.error("Local bundling failed:", e);
                 return false;
               }
             },
@@ -95,8 +96,7 @@ export class GoogleMeetLambdaStack extends cdk.Stack {
       TOKENS_TABLE: tokensTable.tableName,
       SUBSCRIPTIONS_TABLE: subscriptionsTable.tableName,
       KMS_KEY_ID: tokenEncryptionKey.keyId,
-      GOOGLE_CLIENT_ID: googleClientId,
-      GOOGLE_CLIENT_SECRET: googleClientSecret,
+      GOOGLE_OAUTH_SECRET_ARN: googleOAuthSecret.secretArn,
     };
 
     // ========================================
@@ -223,6 +223,9 @@ export class GoogleMeetLambdaStack extends cdk.Stack {
 
       // KMS key for encryption/decryption
       tokenEncryptionKey.grantEncryptDecrypt(fn);
+
+      // Google OAuth secret
+      googleOAuthSecret.grantRead(fn);
     }
 
     // Subscriptions table (only needed by specific lambdas)
