@@ -91,3 +91,55 @@ export const GET_VIDEO_URL = /* GraphQL */ `
     }
   }
 `;
+
+// Meeting queries for Google Meet integration
+export const GET_MEETING = /* GraphQL */ `
+  query GetMeeting($meeting_id: ID!) {
+    getMeeting(meeting_id: $meeting_id) {
+      meeting_id
+      user_id
+      title
+      description
+      start_time
+      end_time
+      status
+      google_calendar_event_id
+      google_meet_space_id
+      google_meet_uri
+      auto_recording
+      auto_transcription
+      recording_file_id
+      recording_s3_key
+      interview_id
+      created_at
+      updated_at
+    }
+  }
+`;
+
+export const LIST_MEETINGS = /* GraphQL */ `
+  query ListMeetings($limit: Int, $nextToken: String, $status: MeetingStatus) {
+    listMeetings(limit: $limit, nextToken: $nextToken, status: $status) {
+      items {
+        meeting_id
+        user_id
+        title
+        description
+        start_time
+        end_time
+        status
+        google_calendar_event_id
+        google_meet_space_id
+        google_meet_uri
+        auto_recording
+        auto_transcription
+        recording_file_id
+        recording_s3_key
+        interview_id
+        created_at
+        updated_at
+      }
+      nextToken
+    }
+  }
+`;

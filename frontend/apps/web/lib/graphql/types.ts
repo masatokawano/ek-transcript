@@ -191,3 +191,101 @@ export interface AnalysisData {
   summary: string | null;
   action_items: string[];
 }
+
+// Meeting types for Google Meet integration
+export type MeetingStatus =
+  | "SCHEDULED"
+  | "IN_PROGRESS"
+  | "COMPLETED"
+  | "CANCELLED"
+  | "RECORDING_AVAILABLE"
+  | "PROCESSING"
+  | "ANALYZED";
+
+export interface Meeting {
+  meeting_id: string;
+  user_id: string;
+  title: string;
+  description?: string | null;
+  start_time: string;
+  end_time: string;
+  status: MeetingStatus;
+  google_calendar_event_id?: string | null;
+  google_meet_space_id?: string | null;
+  google_meet_uri?: string | null;
+  auto_recording?: boolean | null;
+  auto_transcription?: boolean | null;
+  recording_file_id?: string | null;
+  recording_s3_key?: string | null;
+  interview_id?: string | null;
+  created_at: string;
+  updated_at?: string | null;
+}
+
+export interface MeetingConnection {
+  items: Meeting[];
+  nextToken?: string | null;
+}
+
+export interface CreateMeetingInput {
+  title: string;
+  description?: string | null;
+  start_time: string;
+  end_time: string;
+  auto_recording?: boolean | null;
+  auto_transcription?: boolean | null;
+}
+
+export interface UpdateMeetingInput {
+  meeting_id: string;
+  title?: string | null;
+  description?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  status?: MeetingStatus | null;
+  auto_recording?: boolean | null;
+  auto_transcription?: boolean | null;
+  google_calendar_event_id?: string | null;
+  google_meet_space_id?: string | null;
+  google_meet_uri?: string | null;
+  recording_file_id?: string | null;
+  recording_s3_key?: string | null;
+  interview_id?: string | null;
+}
+
+export interface CalendarSyncInput {
+  start_date?: string | null;
+  end_date?: string | null;
+  max_results?: number | null;
+}
+
+export interface CalendarSyncResult {
+  synced_count: number;
+  new_meetings: string[];
+  updated_meetings: string[];
+  errors?: string[] | null;
+}
+
+export interface GetMeetingResponse {
+  getMeeting: Meeting | null;
+}
+
+export interface ListMeetingsResponse {
+  listMeetings: MeetingConnection;
+}
+
+export interface CreateMeetingResponse {
+  createMeeting: Meeting;
+}
+
+export interface UpdateMeetingResponse {
+  updateMeeting: Meeting;
+}
+
+export interface DeleteMeetingResponse {
+  deleteMeeting: Meeting;
+}
+
+export interface SyncCalendarResponse {
+  syncCalendar: CalendarSyncResult;
+}

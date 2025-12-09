@@ -14,9 +14,22 @@ import type {
   GetUploadUrlResponse,
   VideoUrlResponse,
   GetVideoUrlResponse,
+  Meeting,
+  MeetingConnection,
+  MeetingStatus,
+  CreateMeetingInput,
+  UpdateMeetingInput,
+  CalendarSyncInput,
+  CalendarSyncResult,
+  GetMeetingResponse,
+  ListMeetingsResponse,
+  CreateMeetingResponse,
+  UpdateMeetingResponse,
+  DeleteMeetingResponse,
+  SyncCalendarResponse,
 } from "./types";
-import { GET_INTERVIEW, LIST_INTERVIEWS, LIST_INTERVIEWS_BY_SEGMENT, GET_UPLOAD_URL, GET_VIDEO_URL } from "./queries";
-import { UPDATE_INTERVIEW, DELETE_INTERVIEW } from "./mutations";
+import { GET_INTERVIEW, LIST_INTERVIEWS, LIST_INTERVIEWS_BY_SEGMENT, GET_UPLOAD_URL, GET_VIDEO_URL, GET_MEETING, LIST_MEETINGS } from "./queries";
+import { UPDATE_INTERVIEW, DELETE_INTERVIEW, CREATE_MEETING, UPDATE_MEETING, DELETE_MEETING, SYNC_CALENDAR } from "./mutations";
 
 const client = generateClient();
 
@@ -101,4 +114,69 @@ export async function getVideoUrl(key: string): Promise<VideoUrlResponse> {
     throw new Error("Failed to get video URL");
   }
   return response.data.getVideoUrl;
+}
+
+// Meeting functions for Google Meet integration
+export async function getMeeting(meetingId: string): Promise<Meeting | null> {
+  const response = await client.graphql({
+    query: GET_MEETING,
+    variables: { meeting_id: meetingId },
+  }) as GraphQLResult<GetMeetingResponse>;
+  return response.data?.getMeeting ?? null;
+}
+
+export async function listMeetings(
+  limit?: number,
+  nextToken?: string,
+  status?: MeetingStatus
+): Promise<MeetingConnection> {
+  const response = await client.graphql({
+    query: LIST_MEETINGS,
+    variables: { limit, nextToken, status },
+  }) as GraphQLResult<ListMeetingsResponse>;
+  return response.data?.listMeetings ?? { items: [], nextToken: null };
+}
+
+export async function createMeeting(input: CreateMeetingInput): Promise<Meeting> {
+  const response = await client.graphql({
+    query: CREATE_MEETING,
+    variables: { input },
+  }) as GraphQLResult<CreateMeetingResponse>;
+  if (!response.data?.createMeeting) {
+    throw new Error("Failed to create meeting");
+  }
+  return response.data.createMeeting;
+}
+
+export async function updateMeeting(input: UpdateMeetingInput): Promise<Meeting> {
+  const response = await client.graphql({
+    query: UPDATE_MEETING,
+    variables: { input },
+  }) as GraphQLResult<UpdateMeetingResponse>;
+  if (!response.data?.updateMeeting) {
+    throw new Error("Failed to update meeting");
+  }
+  return response.data.updateMeeting;
+}
+
+export async function deleteMeeting(meetingId: string): Promise<Meeting> {
+  const response = await client.graphql({
+    query: DELETE_MEETING,
+    variables: { meeting_id: meetingId },
+  }) as GraphQLResult<DeleteMeetingResponse>;
+  if (!response.data?.deleteMeeting) {
+    throw new Error("Failed to delete meeting");
+  }
+  return response.data.deleteMeeting;
+}
+
+export async function syncCalendar(input?: CalendarSyncInput): Promise<CalendarSyncResult> {
+  const response = await client.graphql({
+    query: SYNC_CALENDAR,
+    variables: { input },
+  }) as GraphQLResult<SyncCalendarResponse>;
+  if (!response.data?.syncCalendar) {
+    throw new Error("Failed to sync calendar");
+  }
+  return response.data.syncCalendar;
 }

@@ -829,6 +829,9 @@ export default function DashboardPage() {
       <header className={styles.header}>
         <h1 className={styles.title}>Interview Dashboard</h1>
         <div className={styles.userInfo}>
+          <Link href="/meetings" className={styles.uploadLink}>
+            Meetings
+          </Link>
           <Link href="/upload" className={styles.uploadLink}>
             Upload
           </Link>
