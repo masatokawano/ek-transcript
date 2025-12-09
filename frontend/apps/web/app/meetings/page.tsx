@@ -1,18 +1,24 @@
 "use client";
 
-import { useState, useEffect, type FormEvent } from "react";
+import { useState, useEffect, useMemo, type FormEvent } from "react";
 import Link from "next/link";
 import { useAuth } from "../../lib/auth-context";
 import {
   listMeetings,
   createMeeting,
   syncCalendar,
+  syncMeetRecordings,
+  analyzeRecording,
+  updateMeeting,
   type Meeting,
   type MeetingStatus,
   type CreateMeetingInput,
+  type Recording,
 } from "../../lib/graphql";
 import { GoogleConnectButton } from "../../components/GoogleConnectButton";
 import styles from "./page.module.css";
+
+type ViewMode = "list" | "calendar";
 
 type FilterStatus = "ALL" | MeetingStatus;
 
@@ -214,7 +220,17 @@ function CreateMeetingModal({ isOpen, onClose, onSubmit }: CreateMeetingModalPro
   );
 }
 
-function MeetingCard({ meeting }: { meeting: Meeting }) {
+interface MeetingCardProps {
+  meeting: Meeting;
+  onEnableRecording?: (meetingId: string) => void;
+  enablingRecording?: boolean;
+}
+
+function MeetingCard({ meeting, onEnableRecording, enablingRecording }: MeetingCardProps) {
+  const isScheduled = meeting.status === "SCHEDULED";
+  const isFuture = new Date(meeting.start_time) > new Date();
+  const showEnableRecording = isScheduled && isFuture && !meeting.auto_recording;
+
   return (
     <div className={styles.meetingCard}>
       <div className={styles.meetingHeader}>
@@ -234,6 +250,18 @@ function MeetingCard({ meeting }: { meeting: Meeting }) {
           )}
           {meeting.auto_transcription && (
             <span className={styles.featureBadge}>文字起こし</span>
+          )}
+          {showEnableRecording && onEnableRecording && (
+            <button
+              className={styles.enableRecordingButton}
+              onClick={(e) => {
+                e.stopPropagation();
+                onEnableRecording(meeting.meeting_id);
+              }}
+              disabled={enablingRecording}
+            >
+              {enablingRecording ? "..." : "録画＆分析を有効化"}
+            </button>
           )}
           {meeting.google_meet_uri && (
             <a
@@ -261,13 +289,238 @@ function MeetingCard({ meeting }: { meeting: Meeting }) {
   );
 }
 
+// Calendar View Component
+interface CalendarViewProps {
+  meetings: Meeting[];
+  currentMonth: Date;
+  onMonthChange: (date: Date) => void;
+}
+
+function CalendarView({ meetings, currentMonth, onMonthChange }: CalendarViewProps) {
+  const daysOfWeek = ["日", "月", "火", "水", "木", "金", "土"];
+
+  const calendarDays = useMemo(() => {
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const startDate = new Date(firstDay);
+    startDate.setDate(startDate.getDate() - firstDay.getDay());
+
+    const days: Date[] = [];
+    const current = new Date(startDate);
+    while (current <= lastDay || days.length % 7 !== 0) {
+      days.push(new Date(current));
+      current.setDate(current.getDate() + 1);
+    }
+    return days;
+  }, [currentMonth]);
+
+  const getMeetingsForDay = (date: Date) => {
+    return meetings.filter((meeting) => {
+      const meetingDate = new Date(meeting.start_time);
+      return (
+        meetingDate.getFullYear() === date.getFullYear() &&
+        meetingDate.getMonth() === date.getMonth() &&
+        meetingDate.getDate() === date.getDate()
+      );
+    });
+  };
+
+  const isToday = (date: Date) => {
+    const today = new Date();
+    return (
+      date.getFullYear() === today.getFullYear() &&
+      date.getMonth() === today.getMonth() &&
+      date.getDate() === today.getDate()
+    );
+  };
+
+  const isCurrentMonth = (date: Date) => {
+    return date.getMonth() === currentMonth.getMonth();
+  };
+
+  const prevMonth = () => {
+    const prev = new Date(currentMonth);
+    prev.setMonth(prev.getMonth() - 1);
+    onMonthChange(prev);
+  };
+
+  const nextMonth = () => {
+    const next = new Date(currentMonth);
+    next.setMonth(next.getMonth() + 1);
+    onMonthChange(next);
+  };
+
+  const getEventClass = (meeting: Meeting) => {
+    if (meeting.status === "RECORDING_AVAILABLE" || meeting.status === "ANALYZED") {
+      return styles.dayEventRecording;
+    }
+    if (meeting.status === "COMPLETED") {
+      return styles.dayEventCompleted;
+    }
+    return styles.dayEventScheduled;
+  };
+
+  return (
+    <div className={styles.calendarSection}>
+      <div className={styles.calendarHeader}>
+        <h3 className={styles.sectionTitle}>カレンダー</h3>
+        <div className={styles.calendarNav}>
+          <button className={styles.calendarNavButton} onClick={prevMonth}>
+            &lt;
+          </button>
+          <span className={styles.calendarMonth}>
+            {currentMonth.getFullYear()}年{currentMonth.getMonth() + 1}月
+          </span>
+          <button className={styles.calendarNavButton} onClick={nextMonth}>
+            &gt;
+          </button>
+        </div>
+      </div>
+      <div className={styles.calendarGrid}>
+        {daysOfWeek.map((day) => (
+          <div key={day} className={styles.dayHeader}>
+            {day}
+          </div>
+        ))}
+        {calendarDays.map((date, index) => {
+          const dayMeetings = getMeetingsForDay(date);
+          const cellClasses = [
+            styles.dayCell,
+            !isCurrentMonth(date) && styles.dayCellOtherMonth,
+            isToday(date) && styles.dayCellToday,
+          ]
+            .filter(Boolean)
+            .join(" ");
+
+          return (
+            <div key={index} className={cellClasses}>
+              <div className={styles.dayNumber}>{date.getDate()}</div>
+              <div className={styles.dayEvents}>
+                {dayMeetings.slice(0, 3).map((meeting) => (
+                  <div
+                    key={meeting.meeting_id}
+                    className={`${styles.dayEvent} ${getEventClass(meeting)}`}
+                    title={meeting.title}
+                  >
+                    {meeting.title}
+                  </div>
+                ))}
+                {dayMeetings.length > 3 && (
+                  <div className={styles.dayEvent}>+{dayMeetings.length - 3}</div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// Recordings Section Component
+interface RecordingsSectionProps {
+  recordings: Recording[];
+  onAnalyze: (recording: Recording) => void;
+  analyzingId: string | null;
+}
+
+function RecordingsSection({ recordings, onAnalyze, analyzingId }: RecordingsSectionProps) {
+  const unanalyzedRecordings = recordings.filter(
+    (r) => r.status !== "ANALYZED" && r.status !== "ANALYZING"
+  );
+
+  if (unanalyzedRecordings.length === 0) {
+    return (
+      <div className={styles.recordingsSection}>
+        <h3 className={styles.sectionTitle}>未分析の録画</h3>
+        <div className={styles.emptyRecordings}>
+          <p className={styles.emptyRecordingsText}>
+            未分析の録画はありません。「録画を同期」で最新の録画を取得してください。
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const formatRecordingTime = (startTime?: string | null, endTime?: string | null) => {
+    if (!startTime) return "";
+    const start = new Date(startTime);
+    const dateStr = start.toLocaleDateString("ja-JP", {
+      month: "short",
+      day: "numeric",
+    });
+    const startStr = start.toLocaleTimeString("ja-JP", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    if (endTime) {
+      const end = new Date(endTime);
+      const endStr = end.toLocaleTimeString("ja-JP", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      return `${dateStr} ${startStr} - ${endStr}`;
+    }
+    return `${dateStr} ${startStr}`;
+  };
+
+  return (
+    <div className={styles.recordingsSection}>
+      <h3 className={styles.sectionTitle}>未分析の録画 ({unanalyzedRecordings.length})</h3>
+      <div className={styles.recordingsList}>
+        {unanalyzedRecordings.map((recording) => (
+          <div key={recording.recording_name} className={styles.recordingCard}>
+            <div className={styles.recordingInfo}>
+              <p className={styles.recordingTitle}>
+                {recording.conference_record.split("/").pop()}
+              </p>
+              <span className={styles.recordingMeta}>
+                {formatRecordingTime(recording.start_time, recording.end_time)}
+                {" | Drive ID: "}
+                {recording.drive_file_id.substring(0, 12)}...
+              </span>
+            </div>
+            <div className={styles.recordingActions}>
+              {recording.export_uri && (
+                <a
+                  href={recording.export_uri}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={styles.viewButton}
+                >
+                  Drive で見る
+                </a>
+              )}
+              <button
+                className={styles.analyzeButton}
+                onClick={() => onAnalyze(recording)}
+                disabled={analyzingId === recording.recording_name}
+              >
+                {analyzingId === recording.recording_name ? "分析中..." : "分析する"}
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function MeetingsContent() {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [recordings, setRecordings] = useState<Recording[]>([]);
   const [filter, setFilter] = useState<FilterStatus>("ALL");
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [currentMonth, setCurrentMonth] = useState(new Date());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [syncingRecordings, setSyncingRecordings] = useState(false);
+  const [analyzingId, setAnalyzingId] = useState<string | null>(null);
+  const [enablingRecording, setEnablingRecording] = useState<string | null>(null);
 
   const fetchMeetings = async () => {
     try {
@@ -306,6 +559,53 @@ function MeetingsContent() {
     }
   };
 
+  const handleSyncRecordings = async () => {
+    setSyncingRecordings(true);
+    try {
+      const result = await syncMeetRecordings({ days_back: 30 });
+      setRecordings(result.recordings_found);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to sync recordings");
+    } finally {
+      setSyncingRecordings(false);
+    }
+  };
+
+  const handleAnalyzeRecording = async (recording: Recording) => {
+    setAnalyzingId(recording.recording_name);
+    try {
+      await analyzeRecording(recording.drive_file_id, recording.recording_name);
+      // Update recording status locally
+      setRecordings((prev) =>
+        prev.map((r) =>
+          r.recording_name === recording.recording_name
+            ? { ...r, status: "ANALYZING" as const }
+            : r
+        )
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to analyze recording");
+    } finally {
+      setAnalyzingId(null);
+    }
+  };
+
+  const handleEnableRecording = async (meetingId: string) => {
+    setEnablingRecording(meetingId);
+    try {
+      await updateMeeting({
+        meeting_id: meetingId,
+        auto_recording: true,
+        auto_transcription: true,
+      });
+      await fetchMeetings();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to enable recording");
+    } finally {
+      setEnablingRecording(null);
+    }
+  };
+
   const filteredMeetings = filter === "ALL"
     ? meetings
     : meetings.filter((m) => m.status === filter);
@@ -329,33 +629,82 @@ function MeetingsContent() {
 
   return (
     <div className={styles.content}>
-      <div className={styles.filters}>
-        {filterOptions.map((option) => (
-          <button
-            key={option.value}
-            className={`${styles.filterButton} ${filter === option.value ? styles.filterButtonActive : ""}`}
-            onClick={() => setFilter(option.value)}
-          >
-            {option.label}
-          </button>
-        ))}
+      {/* View Toggle */}
+      <div className={styles.viewToggle}>
+        <button
+          className={`${styles.viewToggleButton} ${viewMode === "list" ? styles.viewToggleButtonActive : ""}`}
+          onClick={() => setViewMode("list")}
+        >
+          一覧
+        </button>
+        <button
+          className={`${styles.viewToggleButton} ${viewMode === "calendar" ? styles.viewToggleButtonActive : ""}`}
+          onClick={() => setViewMode("calendar")}
+        >
+          カレンダー
+        </button>
+        <button
+          className={styles.syncRecordingsButton}
+          onClick={handleSyncRecordings}
+          disabled={syncingRecordings}
+          style={{ marginLeft: "auto" }}
+        >
+          {syncingRecordings ? "同期中..." : "録画を同期"}
+        </button>
       </div>
 
-      {filteredMeetings.length === 0 ? (
-        <div className={styles.emptyState}>
-          <div className={styles.emptyIcon}>📅</div>
-          <p className={styles.emptyText}>
-            {filter === "ALL"
-              ? "会議がありません。新しい会議を作成するか、カレンダーを同期してください。"
-              : `「${filterOptions.find((o) => o.value === filter)?.label}」の会議はありません。`}
-          </p>
-        </div>
+      {/* Recordings Section */}
+      {recordings.length > 0 && (
+        <RecordingsSection
+          recordings={recordings}
+          onAnalyze={handleAnalyzeRecording}
+          analyzingId={analyzingId}
+        />
+      )}
+
+      {/* Calendar or List View */}
+      {viewMode === "calendar" ? (
+        <CalendarView
+          meetings={meetings}
+          currentMonth={currentMonth}
+          onMonthChange={setCurrentMonth}
+        />
       ) : (
-        <div className={styles.meetingList}>
-          {filteredMeetings.map((meeting) => (
-            <MeetingCard key={meeting.meeting_id} meeting={meeting} />
-          ))}
-        </div>
+        <>
+          <div className={styles.filters}>
+            {filterOptions.map((option) => (
+              <button
+                key={option.value}
+                className={`${styles.filterButton} ${filter === option.value ? styles.filterButtonActive : ""}`}
+                onClick={() => setFilter(option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+
+          {filteredMeetings.length === 0 ? (
+            <div className={styles.emptyState}>
+              <div className={styles.emptyIcon}>📅</div>
+              <p className={styles.emptyText}>
+                {filter === "ALL"
+                  ? "会議がありません。新しい会議を作成するか、カレンダーを同期してください。"
+                  : `「${filterOptions.find((o) => o.value === filter)?.label}」の会議はありません。`}
+              </p>
+            </div>
+          ) : (
+            <div className={styles.meetingList}>
+              {filteredMeetings.map((meeting) => (
+                <MeetingCard
+                  key={meeting.meeting_id}
+                  meeting={meeting}
+                  onEnableRecording={handleEnableRecording}
+                  enablingRecording={enablingRecording === meeting.meeting_id}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       <CreateMeetingModal

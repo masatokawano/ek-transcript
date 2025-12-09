@@ -138,6 +138,17 @@ type Mutation {
   syncCalendar(input: SyncCalendarInput): CalendarSyncResult
     @aws_cognito_user_pools
 
+  # Google Meet 録画同期（Meet REST API v2）
+  syncMeetRecordings(input: SyncMeetRecordingsInput): RecordingSyncResult
+    @aws_cognito_user_pools
+
+  # 録画を分析開始
+  analyzeRecording(
+    drive_file_id: String!
+    recording_name: String!
+  ): Recording
+    @aws_cognito_user_pools
+
   # 会議の録画設定更新
   updateMeetingRecordingConfig(
     meeting_id: ID!
@@ -284,6 +295,44 @@ input SyncCalendarInput {
   start_date: AWSDateTime
   end_date: AWSDateTime
   max_results: Int
+}
+
+# ========================================
+# Recording Types (Google Meet REST API v2)
+# ========================================
+
+type Recording @aws_cognito_user_pools {
+  recording_name: String!
+  conference_record: String!
+  space: String
+  start_time: AWSDateTime
+  end_time: AWSDateTime
+  drive_file_id: String!
+  export_uri: String
+  status: RecordingStatus
+  meeting_id: String
+  interview_id: String
+}
+
+enum RecordingStatus {
+  PENDING
+  DOWNLOADING
+  DOWNLOADED
+  ANALYZING
+  ANALYZED
+  ERROR
+}
+
+type RecordingSyncResult @aws_cognito_user_pools {
+  success: Boolean!
+  conference_records_count: Int!
+  recordings_found: [Recording!]!
+  recordings_downloaded: [Recording!]
+  error_message: String
+}
+
+input SyncMeetRecordingsInput {
+  days_back: Int
 }
 
 # ========================================

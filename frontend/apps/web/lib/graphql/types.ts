@@ -335,3 +335,45 @@ export interface ConnectGoogleResponse {
 export interface DisconnectGoogleResponse {
   disconnectGoogle: GoogleConnectionResult;
 }
+
+// Recording types for Google Meet REST API v2
+export type RecordingStatus =
+  | "PENDING"
+  | "DOWNLOADING"
+  | "DOWNLOADED"
+  | "ANALYZING"
+  | "ANALYZED"
+  | "ERROR";
+
+export interface Recording {
+  recording_name: string;
+  conference_record: string;
+  space?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  drive_file_id: string;
+  export_uri?: string | null;
+  status?: RecordingStatus | null;
+  meeting_id?: string | null;
+  interview_id?: string | null;
+}
+
+export interface RecordingSyncResult {
+  success: boolean;
+  conference_records_count: number;
+  recordings_found: Recording[];
+  recordings_downloaded?: Recording[] | null;
+  error_message?: string | null;
+}
+
+export interface SyncMeetRecordingsInput {
+  days_back?: number | null;
+}
+
+export interface SyncMeetRecordingsResponse {
+  syncMeetRecordings: RecordingSyncResult;
+}
+
+export interface AnalyzeRecordingResponse {
+  analyzeRecording: Recording;
+}

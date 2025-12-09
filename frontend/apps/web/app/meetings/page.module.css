@@ -513,3 +513,336 @@
   margin: 0 0 24px 0;
   text-align: center;
 }
+
+/* Calendar View */
+.calendarSection {
+  margin-bottom: 32px;
+}
+
+.sectionTitle {
+  font-family: var(--font-geist-sans);
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.calendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  background: var(--gray-alpha-100);
+  border: 1px solid var(--gray-alpha-200);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.calendarHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.calendarNav {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.calendarNavButton {
+  appearance: none;
+  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  font-family: var(--font-geist-sans);
+  border: 1px solid var(--gray-alpha-200);
+  background: transparent;
+  color: var(--foreground);
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.calendarNavButton:hover {
+  background: var(--gray-alpha-100);
+}
+
+.calendarMonth {
+  font-family: var(--font-geist-sans);
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.dayHeader {
+  text-align: center;
+  font-family: var(--font-geist-sans);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--foreground);
+  opacity: 0.6;
+  padding: 8px 0;
+}
+
+.dayCell {
+  min-height: 80px;
+  padding: 4px;
+  border-radius: 8px;
+  background: var(--background);
+  border: 1px solid transparent;
+  transition: border-color 0.2s;
+}
+
+.dayCell:hover {
+  border-color: var(--accent);
+}
+
+.dayCellOtherMonth {
+  opacity: 0.4;
+}
+
+.dayCellToday {
+  border-color: var(--accent);
+  background: rgba(var(--accent-rgb), 0.05);
+}
+
+.dayNumber {
+  font-family: var(--font-geist-mono);
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.dayEvents {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dayEvent {
+  font-family: var(--font-geist-sans);
+  font-size: 10px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.dayEventScheduled {
+  background: rgba(var(--accent-rgb), 0.15);
+  color: var(--accent);
+}
+
+.dayEventCompleted {
+  background: rgba(var(--success-rgb), 0.15);
+  color: var(--success);
+}
+
+.dayEventRecording {
+  background: rgba(139, 92, 246, 0.15);
+  color: rgb(139, 92, 246);
+}
+
+/* Recordings Section */
+.recordingsSection {
+  margin-bottom: 32px;
+}
+
+.recordingsList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.recordingCard {
+  background: var(--gray-alpha-100);
+  border: 1px solid var(--gray-alpha-200);
+  border-radius: 12px;
+  padding: 16px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.recordingInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.recordingTitle {
+  font-family: var(--font-geist-sans);
+  font-size: 14px;
+  font-weight: 500;
+  margin: 0 0 4px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recordingMeta {
+  font-family: var(--font-geist-mono);
+  font-size: 12px;
+  color: var(--foreground);
+  opacity: 0.6;
+}
+
+.recordingActions {
+  display: flex;
+  gap: 8px;
+}
+
+.analyzeButton {
+  appearance: none;
+  border-radius: 8px;
+  height: 36px;
+  padding: 0 16px;
+  font-family: var(--font-geist-sans);
+  border: none;
+  background: var(--accent);
+  color: white;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: opacity 0.2s;
+}
+
+.analyzeButton:hover {
+  opacity: 0.9;
+}
+
+.analyzeButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.viewButton {
+  appearance: none;
+  border-radius: 8px;
+  height: 36px;
+  padding: 0 16px;
+  font-family: var(--font-geist-sans);
+  border: 1px solid var(--gray-alpha-200);
+  background: transparent;
+  color: var(--foreground);
+  cursor: pointer;
+  font-size: 13px;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.2s;
+}
+
+.viewButton:hover {
+  background: var(--gray-alpha-100);
+}
+
+/* Sync Recordings Button */
+.syncRecordingsButton {
+  appearance: none;
+  border-radius: 8px;
+  height: 36px;
+  padding: 0 16px;
+  font-family: var(--font-geist-sans);
+  border: 1px solid rgb(139, 92, 246);
+  background: transparent;
+  color: rgb(139, 92, 246);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.2s;
+}
+
+.syncRecordingsButton:hover {
+  background: rgba(139, 92, 246, 0.1);
+}
+
+.syncRecordingsButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Enable Recording Button */
+.enableRecordingButton {
+  appearance: none;
+  border-radius: 6px;
+  height: 28px;
+  padding: 0 10px;
+  font-family: var(--font-geist-sans);
+  border: 1px solid var(--success);
+  background: transparent;
+  color: var(--success);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: background 0.2s;
+}
+
+.enableRecordingButton:hover {
+  background: rgba(var(--success-rgb), 0.1);
+}
+
+/* View Toggle */
+.viewToggle {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.viewToggleButton {
+  appearance: none;
+  border-radius: 8px;
+  height: 32px;
+  padding: 0 12px;
+  font-family: var(--font-geist-sans);
+  border: 1px solid var(--gray-alpha-200);
+  background: transparent;
+  color: var(--foreground);
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+.viewToggleButton:hover {
+  background: var(--gray-alpha-100);
+}
+
+.viewToggleButtonActive {
+  background: var(--foreground);
+  color: var(--background);
+  border-color: var(--foreground);
+}
+
+/* Empty recordings */
+.emptyRecordings {
+  text-align: center;
+  padding: 32px 20px;
+  background: var(--gray-alpha-100);
+  border-radius: 12px;
+  border: 1px dashed var(--gray-alpha-200);
+}
+
+.emptyRecordingsText {
+  font-family: var(--font-geist-sans);
+  font-size: 14px;
+  color: var(--foreground);
+  opacity: 0.6;
+  margin: 0;
+}

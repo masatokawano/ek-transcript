@@ -129,3 +129,43 @@ export const DISCONNECT_GOOGLE = /* GraphQL */ `
     }
   }
 `;
+
+// Recording mutations for Google Meet REST API v2
+export const SYNC_MEET_RECORDINGS = /* GraphQL */ `
+  mutation SyncMeetRecordings($input: SyncMeetRecordingsInput) {
+    syncMeetRecordings(input: $input) {
+      success
+      conference_records_count
+      recordings_found {
+        recording_name
+        conference_record
+        space
+        start_time
+        end_time
+        drive_file_id
+        export_uri
+        status
+        meeting_id
+        interview_id
+      }
+      recordings_downloaded {
+        recording_name
+        drive_file_id
+        status
+      }
+      error_message
+    }
+  }
+`;
+
+export const ANALYZE_RECORDING = /* GraphQL */ `
+  mutation AnalyzeRecording($drive_file_id: String!, $recording_name: String!) {
+    analyzeRecording(drive_file_id: $drive_file_id, recording_name: $recording_name) {
+      recording_name
+      conference_record
+      drive_file_id
+      status
+      interview_id
+    }
+  }
+`;

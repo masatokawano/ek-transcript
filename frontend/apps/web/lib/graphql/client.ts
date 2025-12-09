@@ -27,9 +27,14 @@ import type {
   UpdateMeetingResponse,
   DeleteMeetingResponse,
   SyncCalendarResponse,
+  Recording,
+  RecordingSyncResult,
+  SyncMeetRecordingsInput,
+  SyncMeetRecordingsResponse,
+  AnalyzeRecordingResponse,
 } from "./types";
 import { GET_INTERVIEW, LIST_INTERVIEWS, LIST_INTERVIEWS_BY_SEGMENT, GET_UPLOAD_URL, GET_VIDEO_URL, GET_MEETING, LIST_MEETINGS } from "./queries";
-import { UPDATE_INTERVIEW, DELETE_INTERVIEW, CREATE_MEETING, UPDATE_MEETING, DELETE_MEETING, SYNC_CALENDAR } from "./mutations";
+import { UPDATE_INTERVIEW, DELETE_INTERVIEW, CREATE_MEETING, UPDATE_MEETING, DELETE_MEETING, SYNC_CALENDAR, SYNC_MEET_RECORDINGS, ANALYZE_RECORDING } from "./mutations";
 
 const client = generateClient();
 
@@ -205,4 +210,27 @@ export async function syncCalendar(input?: CalendarSyncInput): Promise<CalendarS
     throw new Error("Failed to sync calendar");
   }
   return response.data.syncCalendar;
+}
+
+// Recording functions for Google Meet REST API v2
+export async function syncMeetRecordings(input?: SyncMeetRecordingsInput): Promise<RecordingSyncResult> {
+  const response = await client.graphql({
+    query: SYNC_MEET_RECORDINGS,
+    variables: { input },
+  }) as GraphQLResult<SyncMeetRecordingsResponse>;
+  if (!response.data?.syncMeetRecordings) {
+    throw new Error("Failed to sync meet recordings");
+  }
+  return response.data.syncMeetRecordings;
+}
+
+export async function analyzeRecording(driveFileId: string, recordingName: string): Promise<Recording> {
+  const response = await client.graphql({
+    query: ANALYZE_RECORDING,
+    variables: { drive_file_id: driveFileId, recording_name: recordingName },
+  }) as GraphQLResult<AnalyzeRecordingResponse>;
+  if (!response.data?.analyzeRecording) {
+    throw new Error("Failed to analyze recording");
+  }
+  return response.data.analyzeRecording;
 }

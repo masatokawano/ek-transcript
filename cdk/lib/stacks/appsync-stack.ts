@@ -290,6 +290,26 @@ export class AppSyncStack extends cdk.Stack {
         runtime: appsync.FunctionRuntime.JS_1_0_0,
         code: appsync.Code.fromAsset(path.join(resolversPath, "syncCalendar.js")),
       });
+
+      // syncMeetRecordings resolver
+      new appsync.Resolver(this, "SyncMeetRecordingsResolver", {
+        api: this.graphqlApi,
+        typeName: "Mutation",
+        fieldName: "syncMeetRecordings",
+        dataSource: calendarSyncDataSource,
+        runtime: appsync.FunctionRuntime.JS_1_0_0,
+        code: appsync.Code.fromAsset(path.join(resolversPath, "syncMeetRecordings.js")),
+      });
+
+      // analyzeRecording resolver
+      new appsync.Resolver(this, "AnalyzeRecordingResolver", {
+        api: this.graphqlApi,
+        typeName: "Mutation",
+        fieldName: "analyzeRecording",
+        dataSource: calendarSyncDataSource,
+        runtime: appsync.FunctionRuntime.JS_1_0_0,
+        code: appsync.Code.fromAsset(path.join(resolversPath, "analyzeRecording.js")),
+      });
     }
 
     // Google Auth Lambda resolvers
