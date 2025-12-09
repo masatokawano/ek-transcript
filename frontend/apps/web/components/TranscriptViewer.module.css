@@ -82,8 +82,3 @@
   text-align: right;
 }
 
-@media (prefers-color-scheme: dark) {
-  .segment {
-    background: var(--gray-alpha-100, rgba(255, 255, 255, 0.06));
-  }
-}
