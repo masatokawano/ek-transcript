@@ -163,8 +163,9 @@ def get_valid_credentials(user_id: str) -> Credentials:
     )
 
     # 期限を設定（timezone-naive で設定、google-auth の内部実装に合わせる）
+    # DynamoDB returns Decimal, convert to int for fromtimestamp
     if item.get("expires_at"):
-        credentials.expiry = datetime.utcfromtimestamp(item["expires_at"])
+        credentials.expiry = datetime.utcfromtimestamp(int(item["expires_at"]))
 
     # トークンが期限切れまたは5分以内に期限切れの場合、更新
     needs_refresh = False
@@ -215,10 +216,11 @@ def check_token_status(user_id: str) -> dict:
         }
 
     # 期限を確認
+    # DynamoDB returns Decimal, convert to int for fromtimestamp
     expires_at = item.get("expires_at")
     is_expired = False
     if expires_at:
-        is_expired = datetime.fromtimestamp(expires_at, tz=timezone.utc) < datetime.now(
+        is_expired = datetime.fromtimestamp(int(expires_at), tz=timezone.utc) < datetime.now(
             timezone.utc
         )
 
@@ -227,7 +229,7 @@ def check_token_status(user_id: str) -> dict:
         "user_id": user_id,
         "email": item.get("email"),
         "scopes": item.get("scopes", []),
-        "expires_at": datetime.fromtimestamp(expires_at, tz=timezone.utc).isoformat()
+        "expires_at": datetime.fromtimestamp(int(expires_at), tz=timezone.utc).isoformat()
         if expires_at
         else None,
         "is_expired": is_expired,
