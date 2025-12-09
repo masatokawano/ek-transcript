@@ -317,6 +317,27 @@ export class StepFunctionsStack extends cdk.Stack {
     // Add Lambda as target for S3 upload events
     s3UploadRule.addTarget(new targets.LambdaFunction(startPipelineLambda));
 
+    // EventBridge rule for Google Meet recording downloads
+    // recordings/{userId}/{meetingId}/{fileName} format
+    const s3RecordingRule = new events.Rule(this, "S3RecordingRule", {
+      ruleName: `ek-transcript-s3-recording-${environment}`,
+      eventPattern: {
+        source: ["aws.s3"],
+        detailType: ["Object Created"],
+        detail: {
+          bucket: {
+            name: [inputBucket.bucketName],
+          },
+          object: {
+            key: [{ prefix: "recordings/" }],
+          },
+        },
+      },
+    });
+
+    // Add Lambda as target for recording events
+    s3RecordingRule.addTarget(new targets.LambdaFunction(startPipelineLambda));
+
     // Completion handler Lambda - updates DynamoDB on execution completion
     const completionHandlerLambda = new lambdaNodejs.NodejsFunction(
       this,

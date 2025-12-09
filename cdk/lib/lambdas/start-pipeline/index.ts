@@ -51,27 +51,48 @@ function isVideoFile(key: string): boolean {
   return VIDEO_EXTENSIONS.some((ext) => lowerKey.endsWith(ext));
 }
 
-function parseS3Key(key: string): {
+interface ParsedS3Key {
   userId: string;
   date: string;
   segment: string;
   fileName: string;
-} {
-  // Expected format: uploads/{userId}/{date}/{segment}/{fileName}
+  meetingId?: string;
+  isRecording: boolean;
+}
+
+function parseS3Key(key: string): ParsedS3Key {
   const parts = key.split("/");
+  const prefix = parts[0];
+
+  // Format: recordings/{userId}/{meetingId}/{fileName}
+  if (prefix === "recordings" && parts.length >= 4) {
+    return {
+      userId: parts[1],
+      date: new Date().toISOString().split("T")[0],
+      segment: "MEETING",
+      fileName: parts.slice(3).join("/"),
+      meetingId: parts[2],
+      isRecording: true,
+    };
+  }
+
+  // Format: uploads/{userId}/{date}/{segment}/{fileName}
   if (parts.length >= 5) {
     return {
       userId: parts[1],
       date: parts[2],
       segment: parts[3],
       fileName: parts.slice(4).join("/"),
+      isRecording: false,
     };
   }
+
   return {
     userId: "unknown",
     date: new Date().toISOString().split("T")[0],
     segment: "unknown",
     fileName: parts[parts.length - 1],
+    isRecording: false,
   };
 }
 
@@ -120,7 +141,7 @@ export async function handler(event: PipelineEvent): Promise<StartPipelineRespon
       continue;
     }
 
-    const { userId, date, segment, fileName: keyFileName } = parseS3Key(key);
+    const { userId, date, segment, fileName: keyFileName, meetingId, isRecording } = parseS3Key(key);
     const interviewId = randomUUID();
     const createdAt = new Date().toISOString();
 
@@ -145,7 +166,7 @@ export async function handler(event: PipelineEvent): Promise<StartPipelineRespon
       console.warn(`Failed to get upload metadata for ${key}:`, err);
     }
 
-    const input = {
+    const input: Record<string, unknown> = {
       interview_id: interviewId,
       bucket: bucket,
       video_key: key,
@@ -157,6 +178,11 @@ export async function handler(event: PipelineEvent): Promise<StartPipelineRespon
       created_at: createdAt,
     };
 
+    // Add meeting_id for recording files
+    if (isRecording && meetingId) {
+      input.meeting_id = meetingId;
+    }
+
     // Start Step Functions execution
     const command = new StartExecutionCommand({
       stateMachineArn: stateMachineArn,
@@ -167,23 +193,30 @@ export async function handler(event: PipelineEvent): Promise<StartPipelineRespon
     const response = await sfnClient.send(command);
 
     // Save interview record to DynamoDB with initial progress
+    const interviewItem: Record<string, unknown> = {
+      interview_id: interviewId,
+      user_id: userId,
+      segment: segment,
+      file_name: originalFileName,
+      file_size: size,
+      video_key: key,
+      bucket: bucket,
+      status: "processing",
+      progress: 0,
+      current_step: "queued",
+      execution_arn: response.executionArn,
+      created_at: createdAt,
+      updated_at: createdAt,
+    };
+
+    // Add meeting_id for recording files
+    if (isRecording && meetingId) {
+      interviewItem.meeting_id = meetingId;
+    }
+
     await docClient.send(new PutCommand({
       TableName: tableName,
-      Item: {
-        interview_id: interviewId,
-        user_id: userId,
-        segment: segment,
-        file_name: originalFileName,
-        file_size: size,
-        video_key: key,
-        bucket: bucket,
-        status: "processing",
-        progress: 0,
-        current_step: "queued",
-        execution_arn: response.executionArn,
-        created_at: createdAt,
-        updated_at: createdAt,
-      },
+      Item: interviewItem,
     }));
 
     results.push(
