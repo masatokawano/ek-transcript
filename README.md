@@ -22,7 +22,7 @@ AWS サーバーレスアーキテクチャを使用した話者分離・文字�
 | 音声抽出 | ffmpeg-python |
 | 話者分離 | pyannote.audio |
 | 文字起こし | faster-whisper |
-| LLM分析 | OpenAI API (gpt-4o-mini) |
+| LLM分析 | OpenAI API (gpt-5-mini) |
 | インフラ | AWS CDK (TypeScript) |
 | パッケージ管理 | uv |
 
@@ -187,7 +187,7 @@ ek-transcript/
 | Lambda (LLM Analysis) | 512MB, 30秒 | $0.0003 |
 | Step Functions | ~200 状態遷移 | $0.005 |
 | S3 | 1GB 保存 + 転送 | $0.03 |
-| OpenAI API | GPT-4o-mini, ~10K tokens | $0.01 |
+| OpenAI API | GPT-5-mini, ~10K tokens | $0.01 |
 | **合計** | | **約 $0.60/動画** |
 
 ### 月額固定コスト (概算)
@@ -220,7 +220,7 @@ ek-transcript/
 | `INPUT_BUCKET` | 入力 S3 バケット | - |
 | `OUTPUT_BUCKET` | 出力 S3 バケット | - |
 | `WHISPER_MODEL` | Whisper モデル | `large-v3` |
-| `OPENAI_MODEL` | OpenAI モデル | `gpt-4o-mini` |
+| `OPENAI_MODEL` | OpenAI モデル | `gpt-5-mini` |
 | `HF_TOKEN_SECRET_ARN` | HuggingFace トークン ARN | - |
 | `OPENAI_SECRET_ARN` | OpenAI API キー ARN | - |
 
