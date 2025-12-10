@@ -476,6 +476,124 @@ def list_recordings(user_id: str, status: str = None) -> list:
     return cached
 
 
+def get_recording(user_id: str, recording_name: str) -> dict | None:
+    """
+    DynamoDB から特定の録画を取得
+
+    Args:
+        user_id: ユーザー ID
+        recording_name: 録画名
+
+    Returns:
+        録画情報（見つからない場合は None）
+    """
+    if not RECORDINGS_TABLE:
+        return None
+
+    table = dynamodb.Table(RECORDINGS_TABLE)
+
+    try:
+        response = table.get_item(
+            Key={
+                "user_id": user_id,
+                "recording_name": recording_name,
+            }
+        )
+        return response.get("Item")
+    except Exception as e:
+        logger.warning(f"Failed to get recording: {e}")
+        return None
+
+
+def update_recording_status(user_id: str, recording_name: str, status: str) -> dict | None:
+    """
+    録画のステータスを更新
+
+    Args:
+        user_id: ユーザー ID
+        recording_name: 録画名
+        status: 新しいステータス
+
+    Returns:
+        更新後の録画情報
+    """
+    if not RECORDINGS_TABLE:
+        return None
+
+    table = dynamodb.Table(RECORDINGS_TABLE)
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    try:
+        response = table.update_item(
+            Key={
+                "user_id": user_id,
+                "recording_name": recording_name,
+            },
+            UpdateExpression="SET #status = :status, updated_at = :updated_at",
+            ExpressionAttributeNames={"#status": "status"},
+            ExpressionAttributeValues={
+                ":status": status,
+                ":updated_at": now_iso,
+            },
+            ReturnValues="ALL_NEW",
+        )
+        return response.get("Attributes")
+    except Exception as e:
+        logger.error(f"Failed to update recording status: {e}")
+        return None
+
+
+def analyze_recording(user_id: str, drive_file_id: str, recording_name: str) -> dict:
+    """
+    録画の分析を開始
+
+    Args:
+        user_id: ユーザー ID
+        drive_file_id: Google Drive ファイル ID
+        recording_name: 録画名
+
+    Returns:
+        録画情報（GraphQL Recording 形式）
+    """
+    logger.info(f"Analyzing recording: {recording_name} for user: {user_id}")
+
+    # DynamoDB から録画情報を取得
+    recording = get_recording(user_id, recording_name)
+
+    if not recording:
+        # 録画が見つからない場合は新規作成
+        logger.info(f"Recording not found, creating new entry: {recording_name}")
+        recording = {
+            "user_id": user_id,
+            "recording_name": recording_name,
+            "drive_file_id": drive_file_id,
+            "conference_record": recording_name.split("/recordings/")[0] if "/recordings/" in recording_name else "",
+            "status": "ANALYZING",
+        }
+        save_recording_to_cache(user_id, recording)
+    else:
+        # ステータスを ANALYZING に更新
+        recording = update_recording_status(user_id, recording_name, "ANALYZING")
+
+    # TODO: 将来的に Step Functions を起動して実際の分析を行う
+    # sfn_client.start_execution(...)
+
+    logger.info(f"Recording analysis started: {recording_name}")
+
+    return {
+        "recording_name": recording.get("recording_name"),
+        "conference_record": recording.get("conference_record", ""),
+        "space": recording.get("space"),
+        "start_time": recording.get("start_time"),
+        "end_time": recording.get("end_time"),
+        "drive_file_id": recording.get("drive_file_id"),
+        "export_uri": recording.get("export_uri"),
+        "status": recording.get("status"),
+        "meeting_id": recording.get("meeting_id"),
+        "interview_id": recording.get("interview_id"),
+    }
+
+
 def sync_meet_recordings(user_id: str, days_back: int = 30) -> dict:
     """
     Google Meet REST API v2 を使用して録画を同期
@@ -687,6 +805,7 @@ def lambda_handler(event: dict, context) -> dict:
     - sync_meet_recordings: Meet REST API v2 で録画を同期
     - list_recordings: キャッシュから録画一覧を取得（高速）
     - list_conference_records: 会議記録一覧を取得
+    - analyze_recording: 録画の分析を開始
     """
     action = event.get("action")
     user_id = event.get("user_id")
@@ -770,6 +889,16 @@ def lambda_handler(event: dict, context) -> dict:
                 "success": True,
                 "conference_records": records,
             }
+
+        elif action == "analyze_recording":
+            drive_file_id = event.get("drive_file_id")
+            recording_name = event.get("recording_name")
+
+            if not drive_file_id or not recording_name:
+                return {"error": "drive_file_id and recording_name are required"}
+
+            result = analyze_recording(user_id, drive_file_id, recording_name)
+            return result
 
         else:
             return {"error": f"Unknown action: {action}"}
