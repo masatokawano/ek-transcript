@@ -30,6 +30,16 @@ interface ExecutionInput {
   recording_name?: string;
 }
 
+interface ExecutionOutput {
+  bucket?: string;
+  analysis_key?: string;
+  transcript_key?: string;
+  status?: string;
+  structured?: boolean;
+  total_score?: number;
+  segment?: string;
+}
+
 export async function handler(event: StepFunctionsEvent): Promise<void> {
   const tableName = process.env.TABLE_NAME;
   const recordingsTableName = process.env.RECORDINGS_TABLE;
@@ -38,7 +48,7 @@ export async function handler(event: StepFunctionsEvent): Promise<void> {
     throw new Error("TABLE_NAME environment variable is not set");
   }
 
-  const { executionArn, status, input } = event.detail;
+  const { executionArn, status, input, output } = event.detail;
 
   // Parse execution input to get interview_id
   let executionInput: ExecutionInput = {};
@@ -46,6 +56,16 @@ export async function handler(event: StepFunctionsEvent): Promise<void> {
     executionInput = JSON.parse(input);
   } catch {
     console.warn("Failed to parse execution input:", input);
+  }
+
+  // Parse execution output to get analysis_key and transcript_key
+  let executionOutput: ExecutionOutput = {};
+  if (output) {
+    try {
+      executionOutput = JSON.parse(output);
+    } catch {
+      console.warn("Failed to parse execution output:", output);
+    }
   }
 
   const interviewId = executionInput.interview_id;
@@ -60,29 +80,66 @@ export async function handler(event: StepFunctionsEvent): Promise<void> {
   const now = new Date().toISOString();
 
   if (status === "SUCCEEDED") {
-    // Update to completed status
+    // Build update expression dynamically based on available output
+    const updateParts = [
+      "#status = :status",
+      "#progress = :progress",
+      "#current_step = :current_step",
+      "#updated_at = :updated_at",
+    ];
+    const expressionNames: Record<string, string> = {
+      "#status": "status",
+      "#progress": "progress",
+      "#current_step": "current_step",
+      "#updated_at": "updated_at",
+    };
+    const expressionValues: Record<string, unknown> = {
+      ":status": "completed",
+      ":progress": 100,
+      ":current_step": "completed",
+      ":updated_at": now,
+    };
+
+    // Add analysis_key if available from llm_analysis output
+    if (executionOutput.analysis_key) {
+      updateParts.push("analysis_key = :analysis_key");
+      expressionValues[":analysis_key"] = executionOutput.analysis_key;
+      console.log(`Adding analysis_key: ${executionOutput.analysis_key}`);
+    }
+
+    // Add transcript_key - derive from analysis_key if not directly available
+    // llm_analysis outputs analysis_key, transcript is at transcripts/{base}_transcript.json
+    if (executionOutput.analysis_key) {
+      // Extract base name from analysis_key: analysis/xxx_structured.json -> xxx
+      const analysisKey = executionOutput.analysis_key;
+      const baseName = analysisKey
+        .replace("analysis/", "")
+        .replace("_structured.json", "")
+        .replace("_analysis.txt", "");
+      const transcriptKey = `transcripts/${baseName}_transcript.json`;
+      updateParts.push("transcript_key = :transcript_key");
+      expressionValues[":transcript_key"] = transcriptKey;
+      console.log(`Adding transcript_key: ${transcriptKey}`);
+    }
+
+    // Add total_score if available
+    if (executionOutput.total_score !== undefined) {
+      updateParts.push("total_score = :total_score");
+      expressionValues[":total_score"] = executionOutput.total_score;
+    }
+
+    // Update to completed status with analysis results
     await docClient.send(
       new UpdateCommand({
         TableName: tableName,
         Key: { interview_id: interviewId },
-        UpdateExpression:
-          "SET #status = :status, #progress = :progress, #current_step = :current_step, #updated_at = :updated_at",
-        ExpressionAttributeNames: {
-          "#status": "status",
-          "#progress": "progress",
-          "#current_step": "current_step",
-          "#updated_at": "updated_at",
-        },
-        ExpressionAttributeValues: {
-          ":status": "completed",
-          ":progress": 100,
-          ":current_step": "completed",
-          ":updated_at": now,
-        },
+        UpdateExpression: "SET " + updateParts.join(", "),
+        ExpressionAttributeNames: expressionNames,
+        ExpressionAttributeValues: expressionValues,
       })
     );
 
-    console.log(`Interview ${interviewId} marked as completed`);
+    console.log(`Interview ${interviewId} marked as completed with analysis results`);
 
     // Update recordings table if applicable
     if (recordingsTableName && executionInput.user_id) {
