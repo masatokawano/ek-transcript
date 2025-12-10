@@ -17,6 +17,7 @@ export interface StepFunctionsStackProps extends cdk.StackProps {
   inputBucket: s3.IBucket;
   outputBucket: s3.IBucket;
   interviewsTable: dynamodb.ITable;
+  recordingsTable?: dynamodb.ITable;
   extractAudioFn: lambda.IFunction;
   chunkAudioFn: lambda.IFunction;
   diarizeFn: lambda.IFunction;
@@ -38,6 +39,7 @@ export class StepFunctionsStack extends cdk.Stack {
       inputBucket,
       outputBucket,
       interviewsTable,
+      recordingsTable,
       extractAudioFn,
       chunkAudioFn,
       diarizeFn,
@@ -349,6 +351,7 @@ export class StepFunctionsStack extends cdk.Stack {
         handler: "handler",
         environment: {
           TABLE_NAME: interviewsTable.tableName,
+          ...(recordingsTable && { RECORDINGS_TABLE: recordingsTable.tableName }),
         },
         timeout: cdk.Duration.seconds(30),
         memorySize: 256,
@@ -362,6 +365,9 @@ export class StepFunctionsStack extends cdk.Stack {
 
     // Grant permissions for completion handler
     interviewsTable.grantWriteData(completionHandlerLambda);
+    if (recordingsTable) {
+      recordingsTable.grantReadWriteData(completionHandlerLambda);
+    }
     // Grant permission to read execution history
     completionHandlerLambda.addToRolePolicy(
       new iam.PolicyStatement({

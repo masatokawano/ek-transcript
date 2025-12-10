@@ -40,7 +40,25 @@ const lambdaStack = new LambdaStack(app, `EkTranscriptLambda-${environment}`, {
 });
 lambdaStack.addDependency(storageStack);
 
-// Step Functions Stack
+// Auth Stack (Cognito User Pool)
+const authStack = new AuthStack(app, `EkTranscriptAuth-${environment}`, {
+  env,
+  environment,
+  description: "Cognito User Pool for ek-transcript authentication",
+});
+
+// Google Meet Storage Stack (before StepFunctions to provide recordingsTable)
+const googleMeetStorageStack = new GoogleMeetStorageStack(
+  app,
+  `EkTranscriptGoogleMeetStorage-${environment}`,
+  {
+    env,
+    environment,
+    description: "DynamoDB tables and KMS key for Google Meet integration",
+  }
+);
+
+// Step Functions Stack (now with recordingsTable for completion handler)
 const stepFunctionsStack = new StepFunctionsStack(
   app,
   `EkTranscriptStepFunctions-${environment}`,
@@ -50,6 +68,7 @@ const stepFunctionsStack = new StepFunctionsStack(
     inputBucket: storageStack.inputBucket,
     outputBucket: storageStack.outputBucket,
     interviewsTable: storageStack.interviewsTable,
+    recordingsTable: googleMeetStorageStack.recordingsTable,
     extractAudioFn: lambdaStack.extractAudioFn,
     chunkAudioFn: lambdaStack.chunkAudioFn,
     diarizeFn: lambdaStack.diarizeFn,
@@ -63,24 +82,7 @@ const stepFunctionsStack = new StepFunctionsStack(
 );
 stepFunctionsStack.addDependency(lambdaStack);
 stepFunctionsStack.addDependency(storageStack);
-
-// Auth Stack (Cognito User Pool)
-const authStack = new AuthStack(app, `EkTranscriptAuth-${environment}`, {
-  env,
-  environment,
-  description: "Cognito User Pool for ek-transcript authentication",
-});
-
-// Google Meet Storage Stack
-const googleMeetStorageStack = new GoogleMeetStorageStack(
-  app,
-  `EkTranscriptGoogleMeetStorage-${environment}`,
-  {
-    env,
-    environment,
-    description: "DynamoDB tables and KMS key for Google Meet integration",
-  }
-);
+stepFunctionsStack.addDependency(googleMeetStorageStack);
 
 // Google Meet Lambda Stack
 const googleMeetLambdaStack = new GoogleMeetLambdaStack(

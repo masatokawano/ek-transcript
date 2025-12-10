@@ -1,5 +1,9 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import {
+  DynamoDBDocumentClient,
+  UpdateCommand,
+  QueryCommand,
+} from "@aws-sdk/lib-dynamodb";
 import { SFNClient, GetExecutionHistoryCommand } from "@aws-sdk/client-sfn";
 
 const dynamoClient = new DynamoDBClient({});
@@ -23,10 +27,12 @@ interface ExecutionInput {
   user_id?: string;
   video_key?: string;
   bucket?: string;
+  recording_name?: string;
 }
 
 export async function handler(event: StepFunctionsEvent): Promise<void> {
   const tableName = process.env.TABLE_NAME;
+  const recordingsTableName = process.env.RECORDINGS_TABLE;
 
   if (!tableName) {
     throw new Error("TABLE_NAME environment variable is not set");
@@ -77,6 +83,16 @@ export async function handler(event: StepFunctionsEvent): Promise<void> {
     );
 
     console.log(`Interview ${interviewId} marked as completed`);
+
+    // Update recordings table if applicable
+    if (recordingsTableName && executionInput.user_id) {
+      await updateRecordingsTable(
+        recordingsTableName,
+        executionInput.user_id,
+        interviewId,
+        "ANALYZED"
+      );
+    }
   } else if (status === "FAILED" || status === "TIMED_OUT" || status === "ABORTED") {
     // Get error details from execution history
     let errorMessage = "";
@@ -150,5 +166,74 @@ export async function handler(event: StepFunctionsEvent): Promise<void> {
     );
 
     console.log(`Interview ${interviewId} marked as failed: ${errorMessage}`);
+
+    // Update recordings table if applicable
+    if (recordingsTableName && executionInput.user_id) {
+      await updateRecordingsTable(
+        recordingsTableName,
+        executionInput.user_id,
+        interviewId,
+        "ERROR"
+      );
+    }
+  }
+}
+
+/**
+ * Update recordings table status based on interview_id
+ * Searches for recordings with matching interview_id and updates their status
+ */
+async function updateRecordingsTable(
+  tableName: string,
+  userId: string,
+  interviewId: string,
+  newStatus: "ANALYZED" | "ERROR"
+): Promise<void> {
+  try {
+    // Query recordings by user_id to find the one with matching interview_id
+    const queryResult = await docClient.send(
+      new QueryCommand({
+        TableName: tableName,
+        KeyConditionExpression: "user_id = :uid",
+        FilterExpression: "interview_id = :iid",
+        ExpressionAttributeValues: {
+          ":uid": userId,
+          ":iid": interviewId,
+        },
+      })
+    );
+
+    if (!queryResult.Items || queryResult.Items.length === 0) {
+      console.log(`No recording found with interview_id: ${interviewId}`);
+      return;
+    }
+
+    const now = new Date().toISOString();
+
+    // Update each matching recording
+    for (const item of queryResult.Items) {
+      const recordingName = item.recording_name as string;
+      await docClient.send(
+        new UpdateCommand({
+          TableName: tableName,
+          Key: {
+            user_id: userId,
+            recording_name: recordingName,
+          },
+          UpdateExpression: "SET #status = :status, updated_at = :updated_at",
+          ExpressionAttributeNames: {
+            "#status": "status",
+          },
+          ExpressionAttributeValues: {
+            ":status": newStatus,
+            ":updated_at": now,
+          },
+        })
+      );
+      console.log(`Recording ${recordingName} marked as ${newStatus}`);
+    }
+  } catch (err) {
+    console.error(`Failed to update recordings table:`, err);
+    // Don't throw - this is a non-critical update
   }
 }

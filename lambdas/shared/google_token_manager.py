@@ -238,6 +238,8 @@ def check_token_status(user_id: str) -> dict:
     """
     ユーザーのトークン状態を確認
 
+    access token が期限切れで refresh_token がある場合、自動的に更新を試みる。
+
     Args:
         user_id: ユーザー ID
 
@@ -259,10 +261,27 @@ def check_token_status(user_id: str) -> dict:
     # DynamoDB returns Decimal, convert to int for fromtimestamp
     expires_at = item.get("expires_at")
     is_expired = False
+    has_refresh_token = bool(item.get("refresh_token"))
+
     if expires_at:
         is_expired = datetime.fromtimestamp(int(expires_at), tz=timezone.utc) < datetime.now(
             timezone.utc
         )
+
+    # access token が期限切れで refresh_token がある場合、自動更新を試みる
+    if is_expired and has_refresh_token:
+        logger.info(f"Token expired for user {user_id}, attempting auto-refresh...")
+        try:
+            # get_valid_credentials は自動的にトークンを更新する
+            _ = get_valid_credentials(user_id)
+            # 更新後のトークン情報を再取得
+            item = get_stored_token(user_id)
+            expires_at = item.get("expires_at") if item else None
+            is_expired = False
+            logger.info(f"Token auto-refreshed successfully for user {user_id}")
+        except (TokenNotFoundError, TokenRefreshError) as e:
+            logger.warning(f"Failed to auto-refresh token for user {user_id}: {e}")
+            # 更新に失敗した場合は is_expired = True のまま
 
     return {
         "connected": True,
@@ -273,5 +292,5 @@ def check_token_status(user_id: str) -> dict:
         if expires_at
         else None,
         "is_expired": is_expired,
-        "has_refresh_token": bool(item.get("refresh_token")),
+        "has_refresh_token": has_refresh_token,
     }
