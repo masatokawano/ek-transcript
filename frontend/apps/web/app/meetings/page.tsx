@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, type FormEvent } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "../../lib/auth-context";
 import {
   listMeetings,
@@ -299,6 +300,7 @@ interface CalendarViewProps {
 }
 
 function CalendarView({ meetings, recordings, currentMonth, onMonthChange }: CalendarViewProps) {
+  const router = useRouter();
   const [currentWeekStart, setCurrentWeekStart] = useState(() => {
     const today = new Date();
     const dayOfWeek = today.getDay();
@@ -309,6 +311,12 @@ function CalendarView({ meetings, recordings, currentMonth, onMonthChange }: Cal
   });
 
   const daysOfWeek = ["日", "月", "火", "水", "木", "金", "土"];
+
+  const handleRecordingClick = (recording: Recording) => {
+    if (recording.status === "ANALYZED" && recording.interview_id) {
+      router.push(`/interview/${recording.interview_id}`);
+    }
+  };
   const hours = Array.from({ length: 24 }, (_, i) => i);
 
   // 週の日付を取得
@@ -507,26 +515,33 @@ function CalendarView({ meetings, recordings, currentMonth, onMonthChange }: Cal
                 ))}
 
                 {/* Recording Events */}
-                {dayRecordings.map((recording) => (
-                  <div
-                    key={recording.recording_name}
-                    className={`${styles.weekViewEvent} ${getRecordingEventClass(recording)}`}
-                    style={getRecordingEventStyle(recording)}
-                    title={`録画: ${recording.conference_record.split("/").pop()} (${recording.status === "ANALYZING" ? "分析中" : recording.status === "ANALYZED" ? "分析済" : "未分析"})`}
-                  >
-                    <div className={styles.weekViewEventTitle}>
-                      {recording.status === "ANALYZING" && "🔄 "}
-                      {recording.status === "ANALYZED" && "✓ "}
-                      録画
+                {dayRecordings.map((recording) => {
+                  const isClickable = recording.status === "ANALYZED" && recording.interview_id;
+                  return (
+                    <div
+                      key={recording.recording_name}
+                      className={`${styles.weekViewEvent} ${getRecordingEventClass(recording)} ${isClickable ? styles.weekViewEventClickable : ""}`}
+                      style={getRecordingEventStyle(recording)}
+                      title={`録画: ${recording.conference_record.split("/").pop()} (${recording.status === "ANALYZING" ? "分析中" : recording.status === "ANALYZED" ? "分析済 - クリックで詳細表示" : "未分析"})`}
+                      onClick={() => handleRecordingClick(recording)}
+                      role={isClickable ? "button" : undefined}
+                      tabIndex={isClickable ? 0 : undefined}
+                      onKeyDown={isClickable ? (e) => e.key === "Enter" && handleRecordingClick(recording) : undefined}
+                    >
+                      <div className={styles.weekViewEventTitle}>
+                        {recording.status === "ANALYZING" && "🔄 "}
+                        {recording.status === "ANALYZED" && "✓ "}
+                        録画
+                      </div>
+                      <div className={styles.weekViewEventTime}>
+                        {recording.start_time && new Date(recording.start_time).toLocaleTimeString("ja-JP", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </div>
                     </div>
-                    <div className={styles.weekViewEventTime}>
-                      {recording.start_time && new Date(recording.start_time).toLocaleTimeString("ja-JP", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             );
           })}
