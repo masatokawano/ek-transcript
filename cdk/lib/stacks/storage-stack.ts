@@ -100,6 +100,7 @@ export class StorageStack extends cdk.Stack {
     );
 
     // DynamoDB table for interview data
+    // Note: Always RETAIN to prevent accidental data loss during deployments
     this.interviewsTable = new dynamodb.Table(this, "InterviewsTable", {
       tableName: `ek-transcript-interviews-${environment}`,
       partitionKey: {
@@ -107,10 +108,7 @@ export class StorageStack extends cdk.Stack {
         type: dynamodb.AttributeType.STRING,
       },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy:
-        environment === "prod"
-          ? cdk.RemovalPolicy.RETAIN
-          : cdk.RemovalPolicy.DESTROY,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
       timeToLiveAttribute: "expires_at",
       pointInTimeRecovery: environment === "prod",
     });
